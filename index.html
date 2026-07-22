@@ -7,7 +7,78 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #0a0a0a;
+      background: #0a0a0a;function loadData() {
+    // ========== 第一步：尝试从 MVU 读取数据 ==========
+    try {
+        // MVU 全局 API 挂载在 window.parent 上
+        var Mvu = window.parent.Mvu;
+        if (Mvu) {
+            // 获取当前消息的变量数据
+            var mvuData = Mvu.getCurrentMvuData();
+            if (mvuData && mvuData.stat_data) {
+                var stat = mvuData.stat_data;
+                
+                // 你的 Schema 定义的是 小雅 对象
+                if (stat.小雅) {
+                    var xiaoya = stat.小雅;
+                    
+                    // 映射 MVU 字段 → wifeData 字段
+                    wifeData.corruption = Number(xiaoya.堕落值) || 0;
+                    wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
+                    wifeData.name = "小雅"; // 固定名字
+                    
+                    // 衣着映射（MVU 是字符串，UI 是对象）
+                    if (xiaoya.衣着) {
+                        wifeData.outfit.top = xiaoya.衣着;
+                    }
+                    
+                    // 改造记录（数组 → 纹身/穿环对象）
+                    if (xiaoya.改造记录 && Array.isArray(xiaoya.改造记录)) {
+                        // 简单处理：如果有记录就标记为有
+                        wifeData.tattoos.has = xiaoya.改造记录.some(function(r) { 
+                            return r.indexOf("纹身") !== -1 || r.indexOf("刺青") !== -1; 
+                        });
+                        wifeData.piercings.has = xiaoya.改造记录.some(function(r) { 
+                            return r.indexOf("穿环") !== -1 || r.indexOf("穿刺") !== -1; 
+                        });
+                    }
+                    
+                    // 玩法标签
+                    if (xiaoya.玩法标签 && Array.isArray(xiaoya.玩法标签)) {
+                        wifeData.kinks = xiaoya.玩法标签;
+                    }
+                    
+                    // 私密日记
+                    if (xiaoya.私密日记) {
+                        wifeData.diary = [{
+                            date: getNowTime().split(" ")[0],
+                            text: xiaoya.私密日记
+                        }];
+                    }
+                    
+                    console.log("✅ [QOS App] 从 MVU 加载数据成功:", xiaoya);
+                }
+            }
+        }
+    } catch(e) {
+        console.log("⚠️ [QOS App] MVU 读取失败（可能还没初始化）:", e.message);
+    }
+    
+    // ========== 第二步：fallback 到旧方式（兼容非 MVU 环境）==========
+    try {
+        var helper = window.TavernHelper || window;
+        if (helper.getVariables) {
+            var cv = helper.getVariables({type:'chat'});
+            var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
+            if (d) { 
+                for (var k in d) wifeData[k] = d[k]; 
+            }
+        }
+    } catch(e) {}
+    
+    initForumPosts();
+    render();
+}
       color: #e0e0e0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
@@ -589,45 +660,77 @@
       render();
     }
 
-    function loadData() {
-  // 方法 1：尝试从 MVU 全局 API 读取
-  try {
-    if (window.parent && window.parent.Mvu) {
-      var mvuData = window.parent.Mvu.getCurrentMvuData();
-      if (mvuData && mvuData.stat_data) {
-        var stat = mvuData.stat_data;
-        
-        // 映射 MVU 数据到你的 wifeData
-        // 假设你的 MVU Schema 定义的是：小雅: { 堕落值, 罩杯, 等级, 衣着, ... }
-        if (stat.小雅) {
-          var xiaoya = stat.小雅;
-          wifeData.corruption = xiaoya.堕落值 || 0;
-          wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
-          // ... 其他字段映射
+function loadData() {
+    // ========== 第一步：尝试从 MVU 读取数据 ==========
+    try {
+        // MVU 全局 API 挂载在 window.parent 上
+        var Mvu = window.parent.Mvu;
+        if (Mvu) {
+            // 获取当前消息的变量数据
+            var mvuData = Mvu.getCurrentMvuData();
+            if (mvuData && mvuData.stat_data) {
+                var stat = mvuData.stat_data;
+                
+                // 你的 Schema 定义的是 小雅 对象
+                if (stat.小雅) {
+                    var xiaoya = stat.小雅;
+                    
+                    // 映射 MVU 字段 → wifeData 字段
+                    wifeData.corruption = Number(xiaoya.堕落值) || 0;
+                    wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
+                    wifeData.name = "小雅"; // 固定名字
+                    
+                    // 衣着映射（MVU 是字符串，UI 是对象）
+                    if (xiaoya.衣着) {
+                        wifeData.outfit.top = xiaoya.衣着;
+                    }
+                    
+                    // 改造记录（数组 → 纹身/穿环对象）
+                    if (xiaoya.改造记录 && Array.isArray(xiaoya.改造记录)) {
+                        // 简单处理：如果有记录就标记为有
+                        wifeData.tattoos.has = xiaoya.改造记录.some(function(r) { 
+                            return r.indexOf("纹身") !== -1 || r.indexOf("刺青") !== -1; 
+                        });
+                        wifeData.piercings.has = xiaoya.改造记录.some(function(r) { 
+                            return r.indexOf("穿环") !== -1 || r.indexOf("穿刺") !== -1; 
+                        });
+                    }
+                    
+                    // 玩法标签
+                    if (xiaoya.玩法标签 && Array.isArray(xiaoya.玩法标签)) {
+                        wifeData.kinks = xiaoya.玩法标签;
+                    }
+                    
+                    // 私密日记
+                    if (xiaoya.私密日记) {
+                        wifeData.diary = [{
+                            date: getNowTime().split(" ")[0],
+                            text: xiaoya.私密日记
+                        }];
+                    }
+                    
+                    console.log("✅ [QOS App] 从 MVU 加载数据成功:", xiaoya);
+                }
+            }
         }
-        
-        console.log("✅ 从 MVU 加载数据成功:", stat);
-      }
+    } catch(e) {
+        console.log("⚠️ [QOS App] MVU 读取失败（可能还没初始化）:", e.message);
     }
-  } catch(e) {
-    console.log("MVU 读取失败:", e);
-  }
-  
-  // 方法 2：fallback 到旧的 TavernHelper 方式
-  try {
-    var helper = window.TavernHelper || window;
-    if (helper.getVariables) {
-      var cv = helper.getVariables({type:'chat'});
-      var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
-      if (d) { 
-        for (var k in d) wifeData[k] = d[k]; 
-        console.log("✅ 从 TavernHelper 加载数据成功");
-      }
-    }
-  } catch(e) {}
-  
-  initForumPosts();
-  render();
+    
+    // ========== 第二步：fallback 到旧方式（兼容非 MVU 环境）==========
+    try {
+        var helper = window.TavernHelper || window;
+        if (helper.getVariables) {
+            var cv = helper.getVariables({type:'chat'});
+            var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
+            if (d) { 
+                for (var k in d) wifeData[k] = d[k]; 
+            }
+        }
+    } catch(e) {}
+    
+    initForumPosts();
+    render();
 }
 
     function generateRepliesForPost(postIndex, authorName) {
