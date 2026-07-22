@@ -378,14 +378,39 @@
 <div class="phone" id="qos-phone">
   <div class="content" id="app"></div>
   <div class="bottom-nav" id="bottomNav">
-    <button class="nav-btn" data-tab="forum">...</button>
-    <!-- ... -->
-  </div>
+  <button class="nav-btn" data-tab="forum"><span class="nav-icon">📋</span><span class="nav-label">论坛</span></button>
+  <button class="nav-btn" data-tab="messages"><span class="nav-icon">💬</span><span class="nav-label">消息</span></button>
+  <button class="nav-btn home-btn active" data-tab="home">♠</button>
+  <button class="nav-btn" data-tab="ranking"><span class="nav-icon">🔥</span><span class="nav-label">热门</span></button>
+  <button class="nav-btn" data-tab="profile"><span class="nav-icon">👤</span><span class="nav-label">绑定</span></button>
 </div>
 
 <!-- Overlays -->
-<div class="diary-overlay" id="diaryOverlay">...</div>
-<div class="post-overlay" id="postOverlay">...</div>
+<div class="diary-overlay" id="diaryOverlay" onclick="closeDiary(event)">
+  <div class="diary-modal" onclick="event.stopPropagation()">
+    <h3><span>📖 私密日记</span><button class="close-btn" onclick="closeDiary()">✕</button></h3>
+    <div id="diaryEntries"></div>
+  </div>
+</div>
+
+<div class="post-overlay" id="postOverlay" onclick="closePostModal(event)">
+  <div class="post-modal" onclick="event.stopPropagation()">
+    <h3><span>📝 发布新帖</span><button class="close-btn" onclick="closePostModal()">✕</button></h3>
+    <div class="post-form">
+      <div><label>版块分类</label><select id="postCategory">
+        <option value="0">【新人报道】</option>
+        <option value="1">【求助提问】</option>
+        <option value="2">【媚黑交流】</option>
+        <option value="3">【同好交友】</option>
+        <option value="4">【纹身穿搭】</option>
+        <option value="5">【视频分享】</option>
+      </select></div>
+      <div><label>帖子标题</label><input type="text" id="postTitle" placeholder="输入标题..." maxlength="50"></div>
+      <div><label>帖子内容</label><textarea id="postContent" placeholder="写下你想说的..." maxlength="1000"></textarea></div>
+      <button class="post-submit-btn" onclick="submitPost()">发布帖子</button>
+    </div>
+  </div>
+</div>
 
 <script>
     var cupSizes = ["A","B","C","D","E","F","G"];
@@ -559,29 +584,45 @@
       render();
     }
 
-    function loadData() {
-      try {
+function loadData() {
+    // ========== 从 MVU 读取数据 ==========
+    try {
+        var Mvu = window.parent.Mvu;
+        if (Mvu) {
+            var mvuData = Mvu.getCurrentMvuData();
+            if (mvuData && mvuData.stat_data) {
+                var stat = mvuData.stat_data;
+                if (stat.小雅) {
+                    var xiaoya = stat.小雅;
+                    wifeData.corruption = Number(xiaoya.堕落值) || 0;
+                    wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
+                    if (xiaoya.衣着) {
+                        wifeData.outfit.top = xiaoya.衣着;
+                    }
+                    if (xiaoya.玩法标签 && Array.isArray(xiaoya.玩法标签)) {
+                        wifeData.kinks = xiaoya.玩法标签;
+                    }
+                    console.log("[QOS] MVU数据加载成功:", xiaoya);
+                }
+            }
+        }
+    } catch(e) {
+        console.log("[QOS] MVU读取失败:", e.message);
+    }
+    
+    // fallback
+    try {
         var helper = window.TavernHelper || window;
         if (helper.getVariables) {
-          var cv = helper.getVariables({type:'chat'});
-          var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
-          if (d) { for (var k in d) wifeData[k] = d[k]; }
+            var cv = helper.getVariables({type:'chat'});
+            var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
+            if (d) { for (var k in d) wifeData[k] = d[k]; }
         }
-      } catch(e) {}
-      initForumPosts();
-      render();
-    }
-
-    function render() {
-      var app = document.getElementById('app');
-      if (!app) return;
-      app.innerHTML = '';
-      if (currentTab === 'home') renderHome(app);
-      else if (currentTab === 'forum') renderForum(app);
-      else if (currentTab === 'messages') renderMessages(app);
-      else if (currentTab === 'ranking') renderRanking(app);
-      else if (currentTab === 'profile') renderProfile(app);
-    }
+    } catch(e) {}
+    
+    initForumPosts();
+    render();
+}
 
     function generateRepliesForPost(postIndex, authorName) {
       var replyData = postReplies[postIndex];
