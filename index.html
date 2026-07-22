@@ -590,28 +590,45 @@
     }
 
     function loadData() {
-      try {
-        var helper = window.TavernHelper || window;
-        if (helper.getVariables) {
-          var cv = helper.getVariables({type:'chat'});
-          var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
-          if (d) { for (var k in d) wifeData[k] = d[k]; }
+  // 方法 1：尝试从 MVU 全局 API 读取
+  try {
+    if (window.parent && window.parent.Mvu) {
+      var mvuData = window.parent.Mvu.getCurrentMvuData();
+      if (mvuData && mvuData.stat_data) {
+        var stat = mvuData.stat_data;
+        
+        // 映射 MVU 数据到你的 wifeData
+        // 假设你的 MVU Schema 定义的是：小雅: { 堕落值, 罩杯, 等级, 衣着, ... }
+        if (stat.小雅) {
+          var xiaoya = stat.小雅;
+          wifeData.corruption = xiaoya.堕落值 || 0;
+          wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
+          // ... 其他字段映射
         }
-      } catch(e) {}
-      initForumPosts();
-      render();
+        
+        console.log("✅ 从 MVU 加载数据成功:", stat);
+      }
     }
-
-    function render() {
-      var app = document.getElementById('app');
-      if (!app) return;
-      app.innerHTML = '';
-      if (currentTab === 'home') renderHome(app);
-      else if (currentTab === 'forum') renderForum(app);
-      else if (currentTab === 'messages') renderMessages(app);
-      else if (currentTab === 'ranking') renderRanking(app);
-      else if (currentTab === 'profile') renderProfile(app);
+  } catch(e) {
+    console.log("MVU 读取失败:", e);
+  }
+  
+  // 方法 2：fallback 到旧的 TavernHelper 方式
+  try {
+    var helper = window.TavernHelper || window;
+    if (helper.getVariables) {
+      var cv = helper.getVariables({type:'chat'});
+      var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
+      if (d) { 
+        for (var k in d) wifeData[k] = d[k]; 
+        console.log("✅ 从 TavernHelper 加载数据成功");
+      }
     }
+  } catch(e) {}
+  
+  initForumPosts();
+  render();
+}
 
     function generateRepliesForPost(postIndex, authorName) {
       var replyData = postReplies[postIndex];
