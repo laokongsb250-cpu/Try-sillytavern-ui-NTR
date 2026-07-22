@@ -575,14 +575,7 @@
     var chatTarget = null;
     var msgTab = 'chat';
 
-    // 兜底：如果通过 .load() 注入且 DOMContentLoaded 已错过，自动初始化
-    setTimeout(function() {
-      if (!window.qosAppInitialized) { qosInit(); }
-    }, 300);
-
     function qosInit() {
-      if (window.qosAppInitialized) return;
-      window.qosAppInitialized = true;
       var navBtns = document.querySelectorAll('#bottomNav .nav-btn');
       for (var i = 0; i < navBtns.length; i++) {
         (function(btn) {
