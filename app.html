@@ -392,8 +392,8 @@
 </style>
 
 <div class="phone" id="qos-phone">
-  <div class="content" id="app"></div>
-  <div class="bottom-nav" id="bottomNav">
+  <div class="content app-container"></div>
+  <div class="bottom-nav qos-bottom-nav">
   <button class="nav-btn" data-tab="forum"><span class="nav-icon">📋</span><span class="nav-label">论坛</span></button>
   <button class="nav-btn" data-tab="messages"><span class="nav-icon">💬</span><span class="nav-label">消息</span></button>
   <button class="nav-btn home-btn active" data-tab="home">♠</button>
@@ -402,14 +402,14 @@
 </div>
 
 <!-- Overlays -->
-<div class="diary-overlay" id="diaryOverlay" onclick="closeDiary(event)">
+<div class="diary-overlay qos-diary-overlay" onclick="closeDiary(event)">
   <div class="diary-modal" onclick="event.stopPropagation()">
     <h3><span>📖 私密日记</span><button class="close-btn" onclick="closeDiary()">✕</button></h3>
-    <div id="diaryEntries"></div>
+    <div class="diary-entries-container"></div>
   </div>
 </div>
 
-<div class="post-overlay" id="postOverlay" onclick="closePostModal(event)">
+<div class="post-overlay" class="postOverlay" onclick="closePostModal(event)">
   <div class="post-modal" onclick="event.stopPropagation()">
     <h3><span>📝 发布新帖</span><button class="close-btn" onclick="closePostModal()">✕</button></h3>
     <div class="post-form">
@@ -575,18 +575,22 @@
     var chatTarget = null;
     var msgTab = 'chat';
 
-    function qosInit() {
-      var navBtns = document.querySelectorAll('#bottomNav .nav-btn');
-      for (var i = 0; i < navBtns.length; i++) {
-        (function(btn) {
-          btn.addEventListener('click', function() {
-            var tab = btn.getAttribute('data-tab') || 'home';
-            switchTab(tab);
-          });
-        })(navBtns[i]);
-      }
-      loadData();
-    }
+function qosInit() {
+  var navs = document.querySelectorAll('.qos-bottom-nav');
+  var currentNav = navs[navs.length - 1]; 
+  if (!currentNav) return;
+  
+  var navBtns = currentNav.querySelectorAll('.nav-btn');
+  for (var i = 0; i < navBtns.length; i++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = btn.getAttribute('data-tab') || 'home';
+        switchTab(tab);
+      });
+    })(navBtns[i]);
+  }
+  loadData();
+}
     if (document.readyState !== 'loading') {
       qosInit();
     } else {
@@ -883,22 +887,45 @@ function loadData() {
       container.innerHTML = html;
     }
 
-    function render() {
-      var container = document.getElementById('app');
-      if (!container) return;
-      switch(currentTab) {
-        case 'home': renderHome(container); break;
-        case 'forum': renderForum(container); break;
-        case 'messages': renderMessages(container); break;
-        case 'ranking': renderRanking(container); break;
-        case 'profile': renderProfile(container); break;
-        default: renderHome(container);
-      }
-    }
+function render() {
+  var containers = document.querySelectorAll('.app-container');
+  var container = containers[containers.length - 1];
+  if (!container) return;
+  
+  switch(currentTab) {
+    case 'home': renderHome(container); break;
+    case 'forum': renderForum(container); break;
+    case 'messages': renderMessages(container); break;
+    case 'ranking': renderRanking(container); break;
+    case 'profile': renderProfile(container); break;
+    default: renderHome(container);
+  }
+}
 
     function toggleLock(el) { var key=el.dataset.key; if(revealedLocks[key]){ revealedLocks[key]=false; el.classList.remove("revealed"); if(key==="partner") el.textContent="🔒 绿奴禁止"; if(key==="affair") el.textContent="🔒 绿奴禁止"; } else{ revealedLocks[key]=true; el.classList.add("revealed"); if(key==="partner") el.textContent="👁 "+wifeData.currentPartner; if(key==="affair") el.textContent="👁 "+wifeData.affairCount+"次"; } }
     function toggleQuest(){ questOpen=!questOpen; render(); }
     function toggleModDetail(type){ var el=document.getElementById("mod-"+type); if(el){ if(el.classList.contains("show")) el.classList.remove("show"); else el.classList.add("show"); } }
-    function openDiary(){ var ov=document.getElementById("diaryOverlay"); var c=document.getElementById("diaryEntries"); if(wifeData.diary&&wifeData.diary.length>0){ var h=""; for(var i=0;i<wifeData.diary.length;i++){ h+='<div class="diary-entry"><div class="diary-date">'+wifeData.diary[i].date+'</div><div class="diary-text">'+wifeData.diary[i].text+'</div></div>'; } c.innerHTML=h; }else{c.innerHTML='<div class="diary-entry"><div class="diary-text" style="color:#666;">暂无日记记录</div></div>';} ov.classList.add("show"); }
-    function closeDiary(e){ if(e&&e.target!==e.currentTarget) return; document.getElementById("diaryOverlay").classList.remove("show"); }
+function openDiary() { 
+  var overlays = document.querySelectorAll('.qos-diary-overlay');
+  var ov = overlays[overlays.length - 1]; // 找最新的弹窗
+  var c = ov.querySelector('.diary-entries-container'); 
+  
+  if (wifeData.diary && wifeData.diary.length > 0) { 
+    var h = ""; 
+    for(var i=0; i<wifeData.diary.length; i++){ 
+      h += '<div class="diary-entry"><div class="diary-date">' + wifeData.diary[i].date + '</div><div class="diary-text">' + wifeData.diary[i].text + '</div></div>'; 
+    } 
+    c.innerHTML = h; 
+  } else {
+    c.innerHTML = '<div class="diary-entry"><div class="diary-text" style="color:#666;">暂无日记记录</div></div>';
+  } 
+  ov.classList.add("show"); 
+}
+
+function closeDiary(e) { 
+  if (e && e.target !== e.currentTarget) return; 
+  var overlays = document.querySelectorAll('.qos-diary-overlay');
+  var ov = overlays[overlays.length - 1];
+  if (ov) ov.classList.remove("show"); 
+}
 </script>
