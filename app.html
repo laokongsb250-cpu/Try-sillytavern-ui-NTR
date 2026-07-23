@@ -1270,13 +1270,126 @@ body {
     font-weight: 700;
     cursor: pointer;
 }
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#qos-phone {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 360px !important;
+    min-height: 360px !important;
+    max-height: 360px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+#qos-phone > .content.app-container {
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    order: 1 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav {
+    display: grid !important;
+    width: 100% !important;
+    height: 68px !important;
+    min-height: 68px !important;
+    max-height: 68px !important;
+    flex: 0 0 68px !important;
+    flex-shrink: 0 !important;
+    order: 2 !important;
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 999 !important;
+    pointer-events: auto !important;
+    grid-template-columns: 1fr 1fr 56px 1fr 1fr !important;
+    gap: 2px !important;
+    padding: 6px 12px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav .nav-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 40px !important;
+    margin: 0 !important;
+    padding: 5px 2px !important;
+    position: relative !important;
+    z-index: 1000 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    border: none !important;
+    background: transparent !important;
+    color: #666 !important;
+    font-size: 10px !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav .nav-btn.active {
+    color: #ff69b4 !important;
+    background: rgba(255,105,180,0.1) !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav .nav-icon {
+    display: block !important;
+    height: 20px !important;
+    font-size: 18px !important;
+    line-height: 20px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav .nav-label {
+    display: block !important;
+    height: 14px !important;
+    font-size: 9px !important;
+    line-height: 14px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#qos-phone > .bottom-nav.qos-bottom-nav .home-btn {
+    display: grid !important;
+    place-items: center !important;
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg,#9b59b6,#8e44ad) !important;
+    color: #fff !important;
+    font-size: 22px !important;
+}
 </style>
 </head>
 <body>
 <div id="qos-phone" class="qos-app">
     <div class="content app-container"></div>
 
-    <nav class="bottom-nav qos-bottom-nav" aria-label="QOS底部菜单">
+    <div class="bottom-nav qos-bottom-nav">
         <button type="button" class="nav-btn" data-tab="forum">
             <span class="nav-icon">▣</span>
             <span class="nav-label">论坛</span>
@@ -1300,7 +1413,7 @@ body {
             <span class="nav-icon">☺</span>
             <span class="nav-label">我的</span>
         </button>
-    </nav>
+    </div>
 
     <div class="qos-overlay qos-diary-overlay" onclick="closeDiary(event)">
         <div class="qos-modal" onclick="event.stopPropagation()">
