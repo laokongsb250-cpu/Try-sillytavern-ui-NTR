@@ -435,6 +435,26 @@
     @keyframes hotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     @keyframes heatGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     .empty-page { display: grid; place-items: center; height: 100%; color: #444; font-size: 14px; }
+    #qos-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+
+  width: 100vw;
+  height: 100dvh;
+  overflow: auto;
+
+  background: #0a0a0a;
+}
+
+#qos-root .phone {
+  width: 100%;
+  max-width: 420px;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0 auto;
+}
+
   </style>
 </head>
 <body>
@@ -707,29 +727,63 @@ function switchTab(tab) {
   render();
 }
 
-    function loadData() {
-  // 方法 1：尝试从 MVU 全局 API 读取
+function loadData() {
   try {
     if (window.parent && window.parent.Mvu) {
       var mvuData = window.parent.Mvu.getCurrentMvuData();
+
       if (mvuData && mvuData.stat_data) {
         var stat = mvuData.stat_data;
-        
-        // 映射 MVU 数据到你的 wifeData
-        // 假设你的 MVU Schema 定义的是：小雅: { 堕落值, 罩杯, 等级, 衣着, ... }
+
         if (stat.小雅) {
           var xiaoya = stat.小雅;
-          wifeData.corruption = xiaoya.堕落值 || 0;
-          wifeData.qosLevel = parseInt(xiaoya.等级) || 0;
-          // ... 其他字段映射
+
+          wifeData.corruption =
+            Number(xiaoya.堕落值) || 0;
+
+          wifeData.qosLevel =
+            parseInt(xiaoya.等级, 5) || 0;
         }
-        
-        console.log("✅ 从 MVU 加载数据成功:", stat);
+
+        console.log('[QOS] MVU 数据读取成功');
       }
     }
-  } catch(e) {
-    console.log("MVU 读取失败:", e);
+  } catch (e) {
+    console.warn('[QOS] MVU 数据读取失败，使用默认数据：', e);
   }
+
+  try {
+    var helper = window.TavernHelper || window;
+
+    if (helper.getVariables) {
+      var cv = helper.getVariables({ type: 'chat' });
+      var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
+
+      if (d) {
+        for (var k in d) {
+          wifeData[k] = d[k];
+        }
+
+        console.log('[QOS] TavernHelper 数据读取成功');
+      }
+    }
+  } catch (e) {
+    console.warn('[QOS] TavernHelper 数据读取失败：', e);
+  }
+
+  try {
+    initForumPosts();
+  } catch (e) {
+    console.error('[QOS] initForumPosts 执行失败：', e);
+  }
+
+  try {
+    render();
+  } catch (e) {
+    console.error('[QOS] render 执行失败：', e);
+  }
+}
+
   
   // 方法 2：fallback 到旧的 TavernHelper 方式
   try {
@@ -748,6 +802,28 @@ function switchTab(tab) {
   render();
 }
 
+function render() {
+  var app = document.getElementById('qos-app');
+
+  if (!app) {
+    console.error('[QOS] 找不到 #qos-app');
+    return;
+  }
+
+  app.innerHTML = '';
+
+  if (currentTab === 'home') {
+    renderHome(app);
+  } else if (currentTab === 'forum') {
+    renderForum(app);
+  } else if (currentTab === 'messages') {
+    renderMessages(app);
+  } else if (currentTab === 'ranking') {
+    renderRanking(app);
+  } else if (currentTab === 'profile') {
+    renderProfile(app);
+  }
+}
 function render() {
   var app = document.getElementById('qos-app');
 
