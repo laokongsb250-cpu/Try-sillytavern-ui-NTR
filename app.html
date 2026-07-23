@@ -559,49 +559,88 @@
     var chatTarget = null;
     var msgTab = 'chat';
 
-    function initApp() {
-      var navBtns = document.querySelectorAll('#bottomNav .nav-btn');
-      for (var i = 0; i < navBtns.length; i++) {
-        (function(btn) {
-          btn.addEventListener('click', function() {
-            var tab = btn.getAttribute('data-tab') || 'home';
-            switchTab(tab);
-          });
-        })(navBtns[i]);
-      }
-      /* 先用当前能读到的数据渲染，避免等待 MVU 期间白屏 */
-      loadData();
-      /* 等 MVU 就绪后再读一次（变量通常绑在最新楼层），并挂上更新监听 */
-      try {
-        if (typeof waitGlobalInitialized === 'function') {
-          waitGlobalInitialized('Mvu').then(function () {
-            loadData();
-            bindMvuEvents();
-          }).catch(function () {});
-        } else {
-          bindMvuEvents();
-        }
-      } catch (e) {}
-    }
-    // 兼容两种嵌入方式：作为完整页面直接打开时文档仍在解析（loading），等事件；
-    // 被 .load() 等方式异步注入时事件早已触发，直接执行初始化。
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initApp);
+function initApp() {
+  var navBtns = document.querySelectorAll('#bottomNav .nav-btn');
+  for (var i = 0; i < navBtns.length; i++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = btn.getAttribute('data-tab') || 'home';
+        switchTab(tab);
+      });
+    })(navBtns[i]);
+  }
+  loadData();
+  try {
+    if (typeof waitGlobalInitialized === 'function') {
+      waitGlobalInitialized('Mvu').then(function () {
+        loadData();
+        bindMvuEvents();
+      }).catch(function () {});
     } else {
-      initApp();
+      bindMvuEvents();
     }
-
-    function switchTab(tab) {
-      currentTab = tab;
-      var btns = document.querySelectorAll('#bottomNav .nav-btn');
-      for (var i = 0; i < btns.length; i++) {
-        btns[i].classList.remove('active');
-        var t = btns[i].getAttribute('data-tab') || 'home';
-        if (t === tab) btns[i].classList.add('active');
+  } catch (e) {}
+  
+  // ===== 新增：每2秒轮询刷新变量 =====
+  setInterval(function() {
+    try {
+      var cv = readMvuVars();
+      if (cv) {
+        var data = unwrapStatData(cv);
+        var d = data && data.小雅 && data.小雅.qos_app && data.小雅.qos_app.wifeProfile;
+        if (d) {
+          var changed = false;
+          for (var k in d) {
+            if (wifeData[k] !== d[k]) { changed = true; break; }
+          }
+          if (changed) {
+            for (var k in d) wifeData[k] = d[k];
+            render();
+          }
+        }
       }
-      if (tab !== 'messages') { msgView = 'list'; }
-      render();
+    } catch(e) {}
+  }, 2000);
+}
+
+function readMvuVars() {
+  // 方式1：直接用全局 getVariables（最可靠）
+  try {
+    if (typeof getVariables === 'function') {
+      var v = getVariables({ type: 'message', message_id: 'latest' });
+      if (v && v.stat_data) return v;
     }
+  } catch(e) {}
+  
+  // 方式2：通过 TavernHelper
+  try {
+    var th = window.TavernHelper || window.parent.TavernHelper;
+    if (th && typeof th.getVariables === 'function') {
+      var v = th.getVariables({ type: 'message', message_id: 'latest' });
+      if (v && v.stat_data) return v;
+    }
+  } catch(e) {}
+  
+  // 方式3：通过 Mvu（可能不在当前 window）
+  try {
+    var mvu = window.Mvu || window.parent.Mvu;
+    if (mvu && mvu.getMvuData) {
+      var v = mvu.getMvuData({ type: 'message', message_id: 'latest' });
+      if (v) return v;
+    }
+  } catch(e) {}
+  
+  // 方式4：chat 级别的变量（兜底）
+  try {
+    if (typeof getVariables === 'function') {
+      var v = getVariables({ type: 'chat' });
+      if (v && v.stat_data) return v;
+    }
+  } catch(e) {}
+  
+  return null;
+}
+
 
     /* 多入口读取变量表：优先 MVU 最新楼层，逐级兜底；任何环境异常都返回 null */
     function readMvuVars() {
@@ -650,14 +689,25 @@
     }
 
     /* 变量初始化/更新后自动刷新界面 */
-    function bindMvuEvents() {
-      try {
-        if (typeof eventOn === 'function' && typeof Mvu !== 'undefined' && Mvu.events) {
-          eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, function () { loadData(); });
-          eventOn(Mvu.events.VARIABLE_INITIALIZED, function () { loadData(); });
-        }
-      } catch (e) {}
+function bindMvuEvents() {
+  try {
+    var mvu = window.Mvu || window.parent.Mvu;
+    if (typeof eventOn === 'function' && mvu && mvu.events) {
+      eventOn(mvu.events.VARIABLE_UPDATE_ENDED, function () { 
+        loadData();  // 事件触发时重新读取
+      });
+      eventOn(mvu.events.VARIABLE_INITIALIZED, function () { 
+        loadData();
+      });
+      console.log('[QOS APP] MVU events bound successfully');
+    } else {
+      console.warn('[QOS APP] Cannot bind MVU events, will rely on polling');
     }
+  } catch (e) {
+    console.warn('[QOS APP] Error binding MVU events:', e);
+  }
+}
+
 
     function render() {
       var app = document.getElementById('app');
