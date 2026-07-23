@@ -8,22 +8,18 @@
     /* 基本重置 */
     * { margin: 0; padding: 0; box-sizing: border-box; } 
 
-    /* 
-     * 在这种注入模式下，body和html的高度是未知的。
-     * 我们不再需要强制它们为100%。
-     */
+    /* 在这种注入模式下，body和html的样式是无效的，所以我们主要关注 .phone 容器 */
     body { 
-        background: #0a0a0a; 
-        color: #e0e0e0; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     
     /* --- 核心修复在这里 --- */
     .phone { 
         width: 100%; 
-        max-width: 100%; 
+        max-width: 100%;
         margin: 0 auto; 
         background: #0f0f0f; 
+        color: #e0e0e0;
         overflow: hidden; 
         display: flex; 
         flex-direction: column;
@@ -33,11 +29,10 @@
          * 使用 aspect-ratio 代替 height。
          * 这会让容器的高度根据其（由父元素决定的）宽度自动计算，
          * 从而得到一个确定的高度，让flex布局生效。
-         * 这个比例 (9 / 19.5) 是从原作者代码中借鉴的。
          */
         aspect-ratio: 9 / 19.5;
         
-        /* 你可以保留 min-height 作为一个最小尺寸保障 */
+        /* 保留一个最小高度以防万一 */
         min-height: 400px;
     }
     
@@ -290,6 +285,7 @@
 </style>
 </head>
 <body>
+    <!-- 你的HTML结构，无需修改 -->
     <div class="phone" id="qos-phone">
         <div class="content app-container"></div>
         <div class="bottom-nav qos-bottom-nav">
@@ -322,6 +318,7 @@
         </div>
     </div>
 
+    <!-- 你的JavaScript，无需修改 -->
     <script>
         var cupSizes = ["A","B","C","D","E","F","G"]; function getCupSize(level) { var idx = 1; if (level >= 5) idx = 3; else if (level >= 3) idx = 2; return cupSizes[idx]; }
         var categoryNames = ["日常吹水","剧情讨论","技术交流","内容分享","影音鉴赏","求助问答"]; var catIcons = ["","","","","",""];
