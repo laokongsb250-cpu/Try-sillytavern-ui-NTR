@@ -1,33 +1,58 @@
-<!-- 文件开头直接是 <style> 标签，没有 <html>, <head>, <body> -->
 <style>
-    /* 基本重置 */
+    /* --- 核心修复：直接内联样式，避免被 .load() 丢弃 --- */
     * { margin: 0; padding: 0; box-sizing: border-box; } 
 
-    /* .phone 是我们现在最外层的容器，所有样式都基于它 */
+    /* 创建一个全屏黑底遮罩，覆盖掉酒馆原本的所有 UI 干扰 */
+    .app-wrapper {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background-color: #050505 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 999999 !important; /* 确保在最上层 */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    
+    /* 手机主容器 */
     .phone { 
         width: 100%; 
-        max-width: 100%; 
-        margin: 0 auto; 
+        max-width: min(450px, calc(95vh * 9 / 19.5)); /* 动态限制宽度，确保比例 */
+        height: 95vh; /* 占据屏幕 95% 高度 */
+        max-height: 850px;
+        aspect-ratio: 9 / 19.5; /* 核心魔法：锁定完美手机比例 */
         background: #0f0f0f; 
         color: #e0e0e0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        border-radius: 24px; 
+        border: 1px solid rgba(255, 105, 180, 0.3); /* 发光边框 */
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), 0 0 15px rgba(255, 105, 180, 0.1);
         overflow: hidden; 
         display: flex; 
         flex-direction: column;
-        
-        /* 【关键修复】使用 aspect-ratio 来确定容器高度 */
-        aspect-ratio: 9 / 19.5;
-        min-height: 400px;
     }
     
     .content { 
         overflow-y: auto; 
         padding: 12px; 
         flex: 1; /* 占据所有剩余空间 */
-        min-height: 0; /* flex布局关键属性 */
+        min-height: 0; /* 必须！防止内部列表把 flex 容器撑爆 */
     }
 
-    /* --- 以下是你原来的CSS --- */
+    .bottom-nav { 
+        flex-shrink: 0; /* 必须！确保菜单栏永远不被挤压 */
+        display: grid; 
+        grid-template-columns: 1fr 1fr 56px 1fr 1fr; 
+        gap: 2px; 
+        padding: 10px 12px; 
+        border-top: 1px solid rgba(255,255,255,0.06); 
+        background: rgba(8,8,8,0.95); 
+        align-items: center; 
+    }
+
+    /* --- 以下是你原本完美的业务 CSS，无需改动 --- */
     .content::-webkit-scrollbar { width: 3px; } 
     .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; } 
     .profile-header { text-align: center; padding: 20px 0; } 
@@ -105,7 +130,6 @@
     .diary-entry:last-child { border-bottom: none; } 
     .diary-date { font-size: 11px; color: #666; margin-bottom: 4px; } 
     .diary-text { font-size: 13px; color: #ccc; line-height: 1.6; } 
-    .bottom-nav { display: grid; grid-template-columns: 1fr 1fr 56px 1fr 1fr; gap: 2px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(8,8,8,0.95); align-items: center; } 
     .nav-btn { background: transparent; border: none; color: #555; padding: 8px 2px 4px; font-size: 10px; cursor: pointer; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; } 
     .nav-btn .nav-icon { font-size: 18px; line-height: 1; } 
     .nav-btn .nav-label { font-size: 9px; } 
@@ -267,37 +291,44 @@
     @keyframes heatGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } } 
     .empty-page { display: grid; place-items: center; height: 100%; color: #444; font-size: 14px; } 
 </style>
-<div class="phone" id="qos-phone">
-    <div class="content app-container"></div>
-    <div class="bottom-nav qos-bottom-nav">
-        <button class="nav-btn" data-tab="forum"><span class="nav-icon"></span><span class="nav-label">论坛</span></button>
-        <button class="nav-btn" data-tab="messages"><span class="nav-icon"></span><span class="nav-label">消息</span></button>
-        <button class="nav-btn home-btn active" data-tab="home">Q</button>
-        <button class="nav-btn" data-tab="ranking"><span class="nav-icon"></span><span class="nav-label">排行</span></button>
-        <button class="nav-btn" data-tab="profile"><span class="nav-icon"></span><span class="nav-label">我的</span></button>
-    </div>
-    <!-- Overlays -->
-    <div class="diary-overlay qos-diary-overlay" onclick="closeDiary(event)">
-        <div class="diary-modal" onclick="event.stopPropagation()">
-            <h3><span>日记</span><button class="close-btn" onclick="closeDiary()">×</button></h3>
-            <div class="diary-entries-container"></div>
+
+<!-- --- 核心外层包装：覆盖酒馆原有界面，将手机 UI 居中显示 --- -->
+<div class="app-wrapper">
+    <div class="phone" id="qos-phone">
+        <div class="content app-container"></div>
+        
+        <div class="bottom-nav qos-bottom-nav">
+            <button class="nav-btn" data-tab="forum"><span class="nav-icon"></span><span class="nav-label">论坛</span></button>
+            <button class="nav-btn" data-tab="messages"><span class="nav-icon"></span><span class="nav-label">消息</span></button>
+            <button class="nav-btn home-btn active" data-tab="home">Q</button>
+            <button class="nav-btn" data-tab="ranking"><span class="nav-icon"></span><span class="nav-label">排行</span></button>
+            <button class="nav-btn" data-tab="profile"><span class="nav-icon"></span><span class="nav-label">我的</span></button>
         </div>
-    </div>
-    <div class="post-overlay" onclick="closePostModal(event)">
-        <div class="post-modal" onclick="event.stopPropagation()">
-            <h3><span>发帖</span><button class="close-btn" onclick="closePostModal()">×</button></h3>
-            <div class="post-form">
-                <div><label>分类</label><select id="postCategory">
-                    <option value="0">分类1</option>
-                    <option value="1">分类2</option>
-                </select></div>
-                <div><label>标题</label><input type="text" id="postTitle" placeholder="请输入标题..." maxlength="50"></div>
-                <div><label>内容</label><textarea id="postContent" placeholder="请输入内容..." maxlength="1000"></textarea></div>
-                <button class="post-submit-btn" onclick="submitPost()">发布</button>
+        
+        <!-- Overlays -->
+        <div class="diary-overlay qos-diary-overlay" onclick="closeDiary(event)">
+            <div class="diary-modal" onclick="event.stopPropagation()">
+                <h3><span>日记</span><button class="close-btn" onclick="closeDiary()">×</button></h3>
+                <div class="diary-entries-container"></div>
+            </div>
+        </div>
+        <div class="post-overlay" onclick="closePostModal(event)">
+            <div class="post-modal" onclick="event.stopPropagation()">
+                <h3><span>发帖</span><button class="close-btn" onclick="closePostModal()">×</button></h3>
+                <div class="post-form">
+                    <div><label>分类</label><select id="postCategory">
+                        <option value="0">日常吹水</option>
+                        <option value="1">剧情讨论</option>
+                    </select></div>
+                    <div><label>标题</label><input type="text" id="postTitle" placeholder="请输入标题..." maxlength="50"></div>
+                    <div><label>内容</label><textarea id="postContent" placeholder="请输入内容..." maxlength="1000"></textarea></div>
+                    <button class="post-submit-btn" onclick="submitPost()">发布</button>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
 <script>
     var cupSizes = ["A","B","C","D","E","F","G"]; function getCupSize(level) { var idx = 1; if (level >= 5) idx = 3; else if (level >= 3) idx = 2; return cupSizes[idx]; }
     var categoryNames = ["日常吹水","剧情讨论","技术交流","内容分享","影音鉴赏","求助问答"]; var catIcons = ["","","","","",""];
@@ -314,8 +345,26 @@
     var questStages = [ {stage:1,from:0,to:1,task:"让老婆穿上奇怪的衣服出门"}, {stage:2,from:1,to:2,task:"在公开场合与老婆进行亲密行为"}, {stage:3,from:2,to:3,task:"邀请第三者加入你们"}, {stage:4,from:3,to:4,task:"完成一次「羞耻」或「露出」挑战"}, {stage:5,from:4,to:5,task:"将老婆的堕落值提升到100%"} ];
     var outfitCategories = [ {icon:"",key:"makeup",label:"妆容"},{icon:"",key:"top",label:"上装"}, {icon:"",key:"bottom",label:"下装"},{icon:"",key:"shoes",label:"鞋袜"},{icon:"",key:"accessory",label:"配饰"} ];
     var currentTab = 'home'; var revealedLocks = {}; var questOpen = false; var selectedCategory = -1; var openPostId = null; var postsInitialized = false; var msgView = 'list'; var chatTarget = null; var msgTab = 'chat';
-    function qosInit() { var navs = document.querySelectorAll('.qos-bottom-nav'); var currentNav = navs[navs.length - 1]; if (!currentNav) return; var navBtns = currentNav.querySelectorAll('.nav-btn'); for (var i = 0; i < navBtns.length; i++) { (function(btn) { btn.addEventListener('click', function() { var tab = btn.getAttribute('data-tab') || 'home'; switchTab(tab); }); })(navBtns[i]); } loadData(); }
-    if (document.readyState !== 'loading') { qosInit(); } else { document.addEventListener('DOMContentLoaded', qosInit); }
+    
+    function qosInit() { 
+        var navs = document.querySelectorAll('.qos-bottom-nav'); 
+        var currentNav = navs[navs.length - 1]; 
+        if (!currentNav) return; 
+        var navBtns = currentNav.querySelectorAll('.nav-btn'); 
+        for (var i = 0; i < navBtns.length; i++) { 
+            (function(btn) { 
+                btn.addEventListener('click', function() { 
+                    var tab = btn.getAttribute('data-tab') || 'home'; 
+                    switchTab(tab); 
+                }); 
+            })(navBtns[i]); 
+        } 
+        loadData(); 
+    }
+    
+    // .load() 会直接执行脚本，此时 DOM 已经就绪
+    qosInit(); 
+
     function switchTab(tab) { currentTab = tab; var btns = document.querySelectorAll('.qos-bottom-nav .nav-btn'); for (var i = 0; i < btns.length; i++) { btns[i].classList.remove('active'); var t = btns[i].getAttribute('data-tab') || 'home'; if (t === tab) btns[i].classList.add('active'); } if (tab !== 'messages') { msgView = 'list'; } render(); }
     function loadData() { try { var Mvu = window.parent.Mvu; if (Mvu) { var mvuData = Mvu.getCurrentMvuData(); if (mvuData && mvuData.stat_data) { var stat = mvuData.stat_data; if (stat.小雅) { var xiaoya = stat.小雅; wifeData.corruption = Number(xiaoya.堕落值) || 0; wifeData.qosLevel = parseInt(xiaoya.等级) || 0; if (xiaoya.上衣) { wifeData.outfit.top = xiaoya.上衣; } if (xiaoya.性癖 && Array.isArray(xiaoya.性癖)) { wifeData.kinks = xiaoya.性癖; } console.log("[QOS] MVU数据已加载:", xiaoya); } } } } catch(e) { console.log("[QOS] MVU数据加载失败:", e.message); } try { var helper = window.TavernHelper || window; if (helper.getVariables) { var cv = helper.getVariables({type:'chat'}); var d = cv && cv.qos_app && cv.qos_app.wifeProfile; if (d) { for (var k in d) wifeData[k] = d[k]; } } } catch(e) {} initForumPosts(); render(); }
     function generateRepliesForPost(postIndex, authorName) { var replyData = postReplies[postIndex]; if (!replyData) { replyData = [{author:"路人甲",text:"沙发"},{author:"路人乙",text:"板凳"}]; } var result = []; var usedAuthors = {}; usedAuthors[authorName]=true; for (var i = 0; i < replyData.length; i++) { var r = replyData[i]; if (!usedAuthors[r.author]) { var avatarClass = "pink"; for (var j = 0; j < npcPool.length; j++) { if (npcPool[j].name === r.author) { avatarClass = npcPool[j].avatarClass; break; } } result.push({author:r.author,text:r.text,time:"刚刚",avatarClass:avatarClass}); usedAuthors[r.author]=true; } } return result; }
@@ -347,4 +396,3 @@
     function openDiary() { var overlays = document.querySelectorAll('.qos-diary-overlay'); var ov = overlays[overlays.length - 1]; var c = ov.querySelector('.diary-entries-container'); if (wifeData.diary && wifeData.diary.length > 0) { var h = ""; for(var i=0; i<wifeData.diary.length; i++){ h += '<div class="diary-entry"><div class="diary-date">' + wifeData.diary[i].date + '</div><div class="diary-text">' + wifeData.diary[i].text + '</div></div>'; } c.innerHTML = h; } else { c.innerHTML = '<div class="diary-entry"><div class="diary-text" style="color:#666;">日记是空的。</div></div>'; } ov.classList.add("show"); }
     function closeDiary(e) { if (e && e.target !== e.currentTarget) return; var overlays = document.querySelectorAll('.qos-diary-overlay'); var ov = overlays[overlays.length - 1]; if (ov) ov.classList.remove("show"); }
 </script>
-<!-- 文件结尾是 </script> 标签，没有 </body>, </html> -->
