@@ -637,7 +637,12 @@
       var cv = readMvuVars();
       if (cv) {
         var data = unwrapStatData(cv);
-        var d = data && data.qos_app && data.qos_app.wifeProfile;
+        var d =
+  data &&
+  data.小雅 &&
+  data.小雅.qos_app &&
+  data.小雅.qos_app.wifeProfile;
+
         if (d) { for (var k in d) wifeData[k] = d[k]; }
       }
       initForumPosts();
