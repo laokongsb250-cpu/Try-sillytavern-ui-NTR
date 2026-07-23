@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QOS App</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     #qos-root,
 #qos-root * {
   margin: 0;
@@ -37,8 +36,14 @@
   padding: 16px;
 }
 
-    .content::-webkit-scrollbar { width: 3px; }
-    .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+#qos-root .content::-webkit-scrollbar {
+  width: 3px;
+}
+
+#qos-root .content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
     
     .profile-header { text-align: center; padding: 20px 0; }
     .profile-avatar {
@@ -135,38 +140,76 @@
     .diary-text { font-size: 13px; color: #ccc; line-height: 1.6; }
     
     /* 底部导航5栏 */
-    #qos-root .bottom-nav {
-      display: grid;
-      grid-template-columns: 1fr 1fr 56px 1fr 1fr;
-      gap: 2px;
-      padding: 6px 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      background: rgba(8,8,8,0.95);
-      flex-shrink: 0;
-      align-items: end;
-    }
-    #qos-root .nav-btn {
-      background: transparent; border: none; color: #555; padding: 8px 2px 4px;
-      font-size: 10px; cursor: pointer; border-radius: 8px;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-    }
-    #qos-root .nav-btn .nav-icon { font-size: 18px; line-height: 1; }
-    #qos-root #qos-root .nav-btn .nav-label { font-size: 9px; }
-    #qos-root #qos-root .nav-btn.active { color: #ff69b4; background: rgba(255,105,180,0.1); }
-    
-    #qos-root .nav-btn.active {
-      width: 56px; height: 56px; border-radius: 50%;
-      background: linear-gradient(135deg, #9b59b6, #8e44ad);
-      border: 2px solid rgba(255,255,255,0.15);
-      color: #fff; font-size: 22px; font-weight: 700;
-      display: grid; place-items: center;
-      margin-top: -16px;
-      box-shadow: 0 4px 16px rgba(155,89,182,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
-      cursor: pointer; transition: all 0.2s;
-    }
-    #qos-root .nav-btn.home-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(155,89,182,0.5); }
-    #qos-root #qos-root .nav-btn.home-btn.active { background: linear-gradient(135deg, #ff69b4, #bd00ff); box-shadow: 0 4px 20px rgba(189,0,255,0.4); }
-    
+#qos-root .bottom-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 56px 1fr 1fr;
+  gap: 2px;
+  padding: 6px 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: rgba(8,8,8,0.95);
+  flex-shrink: 0;
+  align-items: end;
+}
+
+#qos-root .nav-btn {
+  background: transparent;
+  border: none;
+  color: #555;
+  padding: 8px 2px 4px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+#qos-root .nav-btn .nav-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+#qos-root .nav-btn .nav-label {
+  font-size: 9px;
+}
+
+#qos-root .nav-btn.active {
+  color: #ff69b4;
+  background: rgba(255,105,180,0.1);
+}
+
+#qos-root .nav-btn.home-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  border: 2px solid rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  margin-top: -16px;
+  box-shadow:
+    0 4px 16px rgba(155,89,182,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#qos-root .nav-btn.home-btn:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 6px 20px rgba(155,89,182,0.5);
+}
+
+#qos-root .nav-btn.home-btn.active {
+  background: linear-gradient(135deg, #ff69b4, #bd00ff);
+  box-shadow:
+    0 4px 20px rgba(189,0,255,0.4);
+}
+
     /* 论坛 */
     .forum-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
     .forum-header h2 { font-size: 16px; color: #ff69b4; font-weight: 700; }
@@ -580,6 +623,8 @@
     var chatTarget = null;
     var msgTab = 'chat';
 
+var qosStartAttempts = 0;
+
 function initQosApp() {
   var root = document.getElementById('qos-root');
 
@@ -591,9 +636,15 @@ function initQosApp() {
     return true;
   }
 
+  var nav = root.querySelector('#qos-bottomNav');
+
+  if (!nav) {
+    return false;
+  }
+
   root.setAttribute('data-qos-initialized', '1');
 
-  var navBtns = root.querySelectorAll('#qos-bottomNav .nav-btn');
+  var navBtns = nav.querySelectorAll('.nav-btn');
 
   for (var i = 0; i < navBtns.length; i++) {
     (function(btn) {
@@ -608,12 +659,25 @@ function initQosApp() {
   return true;
 }
 
+function startQosApp() {
+  if (initQosApp()) {
+    console.log('[QOS] 初始化成功');
+    return;
+  }
+
+  qosStartAttempts++;
+
+  if (qosStartAttempts < 100) {
+    setTimeout(startQosApp, 100);
+  } else {
+    console.error('[QOS] 初始化失败：找不到 qos-root 或 qos-bottomNav');
+  }
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    initQosApp();
-  }, { once: true });
+  document.addEventListener('DOMContentLoaded', startQosApp, { once: true });
 } else {
-  initQosApp();
+  startQosApp();
 }
 
 function switchTab(tab) {
