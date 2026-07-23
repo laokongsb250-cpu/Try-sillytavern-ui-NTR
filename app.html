@@ -3,277 +3,291 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Interface</title>
-    <style>
-        /* --- 核心修复 --- */
-        /* 1. 让 html 和 body 元素充满整个视窗高度 */
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
-        }
+    <title>QOS App</title>
+<style>
+    /* 基本重置 */
+    * { margin: 0; padding: 0; box-sizing: border-box; } 
 
-        * { margin: 0; padding: 0; box-sizing: border-box; } 
+    /* 
+     * 在这种注入模式下，body和html的高度是未知的。
+     * 我们不再需要强制它们为100%。
+     */
+    body { 
+        background: #0a0a0a; 
+        color: #e0e0e0; 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    
+    /* --- 核心修复在这里 --- */
+    .phone { 
+        width: 100%; 
+        max-width: 100%; 
+        margin: 0 auto; 
+        background: #0f0f0f; 
+        overflow: hidden; 
+        display: flex; 
+        flex-direction: column;
+        
+        /* 
+         * 【关键修复】
+         * 使用 aspect-ratio 代替 height。
+         * 这会让容器的高度根据其（由父元素决定的）宽度自动计算，
+         * 从而得到一个确定的高度，让flex布局生效。
+         * 这个比例 (9 / 19.5) 是从原作者代码中借鉴的。
+         */
+        aspect-ratio: 9 / 19.5;
+        
+        /* 你可以保留 min-height 作为一个最小尺寸保障 */
+        min-height: 400px;
+    }
+    
+    .content { 
+        overflow-y: auto; 
+        padding: 12px; 
+        flex: 1; /* 这个会占据所有剩余空间 */
+        min-height: 0; /* flex布局中的关键属性，防止内容溢出 */
+    }
 
-        /* 2. body 样式简化，移除不再需要的 min-height */
-        body { 
-            background: #0a0a0a; 
-            color: #e0e0e0; 
-        }
-        
-        /* 3. 现在 .phone 的 height: 100% 可以正确工作了 */
-        .phone { 
-            width: 100%; 
-            max-width: 100%; 
-            margin: 0 auto; 
-            background: #0f0f0f; 
-            /* border-radius: 12px; */ /* 在全屏模式下圆角可能不需要 */
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100%; /* <-- 这一行现在是有效的 */
-        }
-        
-        .content { overflow-y: auto; padding: 12px; flex: 1; min-height: 0; }
-        .content::-webkit-scrollbar { width: 3px; }
-        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-        .profile-header { text-align: center; padding: 20px 0; }
-        .profile-avatar { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; background: linear-gradient(135deg, #ff69b4, #bd00ff); display: grid; place-items: center; font-size: 48px; overflow: hidden; }
-        .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .profile-name { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-        .profile-meta { font-size: 13px; color: #888; margin-bottom: 8px; }
-        .profile-status { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; background: rgba(255,105,180,0.15); color: #ff69b4; border: 1px solid rgba(255,105,180,0.3); }
-        .profile-status.locked { background: rgba(255,77,77,0.1); color: #ff4d4d; border-color: rgba(255,77,77,0.3); }
-        .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-        .card-title { font-size: 14px; font-weight: 700; color: #ff69b4; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
-        .meter-row { margin-bottom: 14px; }
-        .meter-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
-        .meter-label span:first-child { color: #aaa; }
-        .meter-label span:last-child { color: #fff; font-weight: 600; }
-        .meter-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
-        .meter-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
-        .meter-fill.corruption { background: linear-gradient(90deg, #ff69b4, #bd00ff); }
-        .level-display { text-align: center; padding: 8px 0; }
-        .level-symbol { font-size: 28px; letter-spacing: 4px; }
-        .level-name { font-size: 12px; color: #888; margin-top: 4px; }
-        .lock-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .lock-item:last-child { border-bottom: none; }
-        .lock-label { font-size: 12px; color: #aaa; }
-        .lock-value { font-size: 13px; color: #fff; font-weight: 600; }
-        .lock-value.locked { color: #555; cursor: pointer; user-select: none; }
-        .lock-value.locked.revealed { color: #ff69b4; }
-        .body-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 10px; }
-        .body-stat-item { text-align: center; padding: 12px 8px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
-        .body-stat-value { font-size: 20px; font-weight: 700; color: #fff; }
-        .body-stat-label { font-size: 11px; color: #666; margin-top: 4px; }
-        .body-detail { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .body-detail:last-child { border-bottom: none; }
-        .body-detail-label { font-size: 11px; color: #666; margin-bottom: 2px; }
-        .body-detail-value { font-size: 13px; color: #ccc; }
-        .outfit-grid { display: grid; gap: 8px; padding: 4px 0; }
-        .outfit-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
-        .outfit-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.15); }
-        .outfit-info { flex: 1; }
-        .outfit-category { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
-        .outfit-desc { font-size: 13px; color: #ddd; }
-        .quest-toggle { width: 100%; background: none; border: none; display: flex; justify-content: space-between; color: #ff69b4; font-size: 14px; font-weight: 700; cursor: pointer; padding: 0; margin-bottom: 14px; }
-        .quest-toggle .arrow { transition: transform 0.2s; font-size: 12px; }
-        .quest-toggle .arrow.open { transform: rotate(180deg); }
-        .quest-list { display: none; gap: 8px; }
-        .quest-list.open { display: grid; }
-        .quest-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid rgba(255,255,255,0.06); }
-        .quest-item .quest-icon { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex-shrink: 0; }
-        .quest-item.locked { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); color: #444; }
-        .quest-item.locked .quest-icon { background: rgba(255,255,255,0.05); color: #444; border: 1px solid rgba(255,255,255,0.08); }
-        .quest-item.available { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: #ddd; }
-        .quest-item.available .quest-icon { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
-        .quest-item.completed { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.2); color: #4ade80; }
-        .quest-item.completed .quest-icon { background: rgba(74,222,128,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
-        .quest-item .quest-stage { font-size: 10px; color: inherit; opacity: 0.6; margin-left: auto; flex-shrink: 0; }
-        .mod-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
-        .mod-item:last-child { border-bottom: none; }
-        .mod-name { font-size: 13px; color: #ccc; }
-        .mod-status { font-size: 12px; padding: 3px 10px; border-radius: 999px; }
-        .mod-status.yes { background: rgba(74,222,128,0.15); color: #4ade80; }
-        .mod-status.no { background: rgba(255,255,255,0.05); color: #666; }
-        .mod-detail { padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-top: 8px; font-size: 12px; color: #aaa; line-height: 1.6; display: none; }
-        .mod-detail.show { display: block; }
-        .kink-list { display: flex; flex-wrap: wrap; gap: 8px; }
-        .kink-tag { padding: 6px 14px; border-radius: 999px; font-size: 12px; background: rgba(255,105,180,0.15); color: #ff69b4; border: 1px solid rgba(255,105,180,0.3); }
-        .kink-tag.locked { background: rgba(255,255,255,0.03); color: #444; border-color: rgba(255,255,255,0.08); }
-        .diary-btn { width: 100%; padding: 14px; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.2); border-radius: 12px; color: #ff69b4; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .diary-btn:hover { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.4); }
-        .diary-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; place-items: center; z-index: 100; padding: 20px; }
-        .diary-overlay.show { display: grid; }
-        .diary-modal { width: min(100%, 380px); max-height: 70vh; background: #1a1a1a; border: 1px solid rgba(255,105,180,0.3); border-radius: 16px; padding: 20px; overflow-y: auto; }
-        .diary-modal h3 { font-size: 16px; color: #ff69b4; margin-bottom: 16px; display: flex; justify-content: space-between; }
-        .diary-modal .close-btn { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; }
-        .diary-entry { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .diary-entry:last-child { border-bottom: none; }
-        .diary-date { font-size: 11px; color: #666; margin-bottom: 4px; }
-        .diary-text { font-size: 13px; color: #ccc; line-height: 1.6; }
-        .bottom-nav { display: grid; grid-template-columns: 1fr 1fr 56px 1fr 1fr; gap: 2px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(8,8,8,0.95); align-items: center; }
-        .nav-btn { background: transparent; border: none; color: #555; padding: 8px 2px 4px; font-size: 10px; cursor: pointer; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .nav-btn .nav-icon { font-size: 18px; line-height: 1; }
-        .nav-btn .nav-label { font-size: 9px; }
-        .nav-btn.active { color: #ff69b4; background: rgba(255,105,180,0.1); }
-        .nav-btn.home-btn { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #9b59b6, #8e44ad); border: 2px solid rgba(255,255,255,0.15); color: #fff; font-size: 22px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 4px 16px rgba(155,89,182,0.4), inset 0 1px 0 rgba(255,255,255,0.15); cursor: pointer; transition: all 0.2s; }
-        .nav-btn.home-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(155,89,182,0.5); }
-        .nav-btn.home-btn.active { background: linear-gradient(135deg, #ff69b4, #bd00ff); box-shadow: 0 4px 20px rgba(189,0,255,0.4); }
-        .forum-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
-        .forum-header h2 { font-size: 16px; color: #ff69b4; font-weight: 700; }
-        .forum-actions { display: flex; gap: 6px; }
-        .forum-btn { border: 1px solid rgba(255,105,180,0.25); background: rgba(255,105,180,0.08); color: #ff69b4; border-radius: 8px; padding: 6px 12px; font-size: 11px; cursor: pointer; white-space: nowrap; }
-        .forum-btn:hover { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.4); }
-        .forum-btn.post-btn { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.35); font-weight: 700; }
-        .category-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
-        .category-tab { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #888; border-radius: 999px; padding: 6px 6px; font-size: 11px; cursor: pointer; text-align: center; }
-        .category-tab:hover { border-color: rgba(255,105,180,0.2); color: #ccc; }
-        .category-tab.active { background: rgba(255,105,180,0.12); border-color: rgba(255,105,180,0.3); color: #ff69b4; font-weight: 600; }
-        .post-list { display: grid; gap: 8px; }
-        .post-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; cursor: pointer; }
-        .post-card:hover { border-color: rgba(255,105,180,0.15); background: rgba(255,255,255,0.04); }
-        .post-card.open { border-color: rgba(255,105,180,0.2); background: rgba(255,255,255,0.04); }
-        .post-top { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
-        .post-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 14px; overflow: hidden; }
-        .post-avatar.pink { background: linear-gradient(135deg, #ff69b4, #ff1493); }
-        .post-avatar.purple { background: linear-gradient(135deg, #bd00ff, #7b00ff); }
-        .post-avatar.blue { background: linear-gradient(135deg, #00bfff, #0066ff); }
-        .post-avatar.green { background: linear-gradient(135deg, #00ff88, #00aa55); }
-        .post-avatar.orange { background: linear-gradient(135deg, #ff8800, #ff4400); }
-        .post-avatar.teal { background: linear-gradient(135deg, #00ffcc, #0099aa); }
-        .post-avatar.red { background: linear-gradient(135deg, #ff3333, #aa0000); }
-        .post-avatar.gold { background: linear-gradient(135deg, #ffd700, #ffaa00); }
-        .post-avatar.silver { background: linear-gradient(135deg, #c0c0c0, #808080); }
-        .post-avatar.magenta { background: linear-gradient(135deg, #ff00ff, #cc00aa); }
-        .post-info { flex: 1; min-width: 0; }
-        .post-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .post-meta-line { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #666; flex-wrap: wrap; }
-        .post-category-tag { font-size: 9px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,105,180,0.2); color: #ff69b4; background: rgba(255,105,180,0.06); }
-        .post-author { color: #999; }
-        .post-time { color: #555; }
-        .post-stats { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #555; flex-shrink: 0; }
-        .post-stats span { display: flex; align-items: center; gap: 2px; }
-        .post-body { display: none; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 8px; }
-        .post-body.show { display: block; }
-        .post-content { font-size: 12px; color: #ccc; line-height: 1.8; margin-bottom: 10px; white-space: pre-wrap; }
-        .video-card { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 10px; }
-        .video-icon { width: 48px; height: 48px; border-radius: 8px; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.15); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
-        .video-info { flex: 1; }
-        .video-filename { font-size: 11px; color: #aaa; margin-bottom: 4px; font-family: monospace; }
-        .video-desc { font-size: 11px; color: #666; line-height: 1.5; }
-        .video-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; background: rgba(255,105,180,0.1); color: #ff69b4; border: 1px solid rgba(255,105,180,0.15); margin-top: 4px; }
-        .reply-section { margin-top: 8px; }
-        .reply-title { font-size: 11px; color: #888; margin-bottom: 6px; font-weight: 600; }
-        .reply-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .reply-item:last-child { border-bottom: none; }
-        .reply-avatar { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; }
-        .reply-body { flex: 1; }
-        .reply-author { font-size: 11px; color: #ff69b4; font-weight: 600; margin-bottom: 2px; }
-        .reply-text { font-size: 11px; color: #aaa; line-height: 1.5; }
-        .reply-text .time { display: block; margin-top: 4px; font-size: 9px; color: #555; }
-        .post-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; place-items: center; z-index: 100; padding: 20px; }
-        .post-overlay.show { display: grid; }
-        .post-modal { width: min(100%, 380px); background: #1a1a1a; border: 1px solid rgba(255,105,180,0.3); border-radius: 16px; padding: 20px; }
-        .post-modal h3 { font-size: 16px; color: #ff69b4; margin-bottom: 16px; display: flex; justify-content: space-between; }
-        .post-modal .close-btn { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; }
-        .post-form { display: grid; gap: 12px; }
-        .post-form label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; }
-        .post-form select, .post-form input, .post-form textarea { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #ddd; font-size: 13px; outline: none; }
-        .post-form select:focus, .post-form input:focus, .post-form textarea:focus { border-color: rgba(255,105,180,0.3); }
-        .post-form textarea { min-height: 100px; resize: vertical; }
-        .post-submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #ff69b4, #bd00ff); border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
-        .post-submit-btn:hover { filter: brightness(1.1); }
-        .messages-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .messages-header h2 { font-size: 16px; color: #ff69b4; font-weight: 700; }
-        .msg-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-        .msg-tab { flex: 1; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #888; border-radius: 8px; padding: 8px; font-size: 11px; cursor: pointer; text-align: center; }
-        .msg-tab.active { background: rgba(255,105,180,0.1); border-color: rgba(255,105,180,0.25); color: #ff69b4; font-weight: 600; }
-        .contact-list { display: grid; gap: 8px; }
-        .contact-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); cursor: pointer; }
-        .contact-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,105,180,0.15); }
-        .contact-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 18px; }
-        .contact-avatar.mine { background: linear-gradient(135deg, #ff69b4, #bd00ff); }
-        .contact-avatar.chris { background: linear-gradient(135deg, #333333, #666666); }
-        .contact-avatar.yumi { background: linear-gradient(135deg, #ff1493, #ff69b4); }
-        .contact-avatar.wife { background: linear-gradient(135deg, #4fc3f7, #0288d1); }
-        .contact-info { flex: 1; min-width: 0; }
-        .contact-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; }
-        .contact-preview { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .contact-time { font-size: 10px; color: #555; flex-shrink: 0; }
-        .notice-item { padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; }
-        .notice-title { font-size: 12px; color: #ff69b4; font-weight: 600; margin-bottom: 4px; }
-        .notice-text { font-size: 11px; color: #888; line-height: 1.5; }
-        .notice-time { font-size: 9px; color: #555; margin-top: 6px; }
-        .chat-view { display: flex; flex-direction: column; height: 100%; }
-        .chat-header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; }
-        .chat-header .back-btn { background: none; border: none; color: #aaa; font-size: 16px; cursor: pointer; padding: 4px; }
-        .chat-header .chat-name { font-size: 15px; font-weight: 600; color: #fff; }
-        .chat-header .chat-status { font-size: 10px; color: #666; margin-left: auto; }
-        .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 0; margin-bottom: 12px; }
-        .chat-messages::-webkit-scrollbar { width: 3px; }
-        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 12px; line-height: 1.6; }
-        .chat-bubble.sent { align-self: flex-end; background: linear-gradient(135deg, #ff69b4, #bd00ff); color: #fff; border-bottom-right-radius: 4px; }
-        .chat-bubble.received { align-self: flex-start; background: rgba(255,255,255,0.06); color: #ddd; border-bottom-left-radius: 4px; }
-        .chat-bubble .bubble-time { display: block; font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 4px; text-align: right; }
-        .chat-bubble.received .bubble-time { color: #666; }
-        .chat-input-area { display: flex; gap: 8px; align-items: flex-end; }
-        .chat-input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 14px; color: #ddd; font-size: 13px; outline: none; resize: none; min-height: 40px; max-height: 100px; }
-        .chat-input:focus { border-color: rgba(255,105,180,0.3); }
-        .chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff69b4, #bd00ff); border: none; color: #fff; font-size: 16px; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; }
-        .chat-send-btn:hover { filter: brightness(1.1); }
-        .ranking-section { display: grid; gap: 10px; }
-        .ranking-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; }
-        .ranking-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .ranking-header h3 { font-size: 14px; font-weight: 700; color: #ff69b4; margin: 0; }
-        .ranking-header .hot-icon { font-size: 16px; animation: hotPulse 1s ease-in-out infinite; }
-        .rank-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .rank-item:last-child { border-bottom: none; }
-        .rank-number { width: 24px; font-size: 13px; font-weight: 800; color: #555; text-align: center; flex-shrink: 0; }
-        .rank-number.gold { color: #ffd700; }
-        .rank-number.silver { color: #c0c0c0; }
-        .rank-number.bronze { color: #cd7f32; }
-        .rank-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 16px; }
-        .rank-avatar.yumi { background: linear-gradient(135deg, #ff1493, #ff69b4); }
-        .rank-avatar.goldbg { background: linear-gradient(135deg, #ffd700, #ffaa00); }
-        .rank-avatar.purplebg { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
-        .rank-avatar.tealbg { background: linear-gradient(135deg, #1abc9c, #16a085); }
-        .rank-avatar.pinkbg { background: linear-gradient(135deg, #ff69b4, #ff1493); }
-        .rank-info { flex: 1; min-width: 0; }
-        .rank-name { font-size: 13px; font-weight: 600; color: #fff; }
-        .rank-name .title-tag { font-size: 9px; color: #ff69b4; margin-left: 6px; }
-        .rank-meta { font-size: 10px; color: #666; margin-top: 2px; }
-        .rank-heat { font-size: 12px; font-weight: 700; color: #ff69b4; flex-shrink: 0; animation: heatGlow 1.5s ease-in-out infinite; }
-        .rank-post-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .rank-post-item:last-child { border-bottom: none; }
-        .rank-post-title { flex: 1; font-size: 12px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .rank-post-heat { font-size: 11px; color: #ff69b4; font-weight: 600; flex-shrink: 0; }
-        .rank-post-cat { font-size: 9px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,105,180,0.2); color: #ff69b4; background: rgba(255,105,180,0.06); flex-shrink: 0; }
-        .bond-status-box { margin-top: 10px; padding: 12px 14px; border-radius: 12px; border: 2px solid rgba(255,105,180,0.3); background: rgba(255,105,180,0.06); display: flex; justify-content: space-between; align-items: center; }
-        .bond-label { font-size: 12px; color: #aaa; }
-        .bond-name { font-size: 14px; font-weight: 700; color: #fff; }
-        .bond-status { font-size: 12px; color: #888; font-weight: 600; }
-        .home-hero { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0 30px; text-align: center; }
-        .home-spade { font-size: 120px; line-height: 1; font-weight: 900; background: linear-gradient(135deg, #ff69b4, #bd00ff, #9b59b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 30px rgba(189,0,255,0.3)) drop-shadow(0 0 60px rgba(255,105,180,0.15)); margin-bottom: 8px; position: relative; animation: spadeGlow 3s ease-in-out infinite; }
-        .home-spade-q { font-size: 48px; line-height: 1; font-weight: 900; color: rgba(255,255,255,0.1); margin-top: -20px; margin-bottom: 20px; letter-spacing: 8px; }
-        .home-welcome { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; letter-spacing: 2px; }
-        .home-sub { font-size: 12px; color: #888; margin-bottom: 20px; }
-        .home-divider { width: 60px; height: 2px; background: linear-gradient(90deg, transparent, #ff69b4, transparent); margin: 0 auto 16px; }
-        @keyframes spadeGlow { 0%, 100% { filter: drop-shadow(0 0 30px rgba(189,0,255,0.3)) drop-shadow(0 0 60px rgba(255,105,180,0.15)); } 50% { filter: drop-shadow(0 0 40px rgba(189,0,255,0.5)) drop-shadow(0 0 80px rgba(255,105,180,0.25)); } }
-        .home-activity { margin-top: 4px; }
-        .home-activity-item { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .home-activity-item:last-child { border-bottom: none; }
-        .home-activity-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
-        .home-activity-icon.msg { background: rgba(255,105,180,0.15); }
-        .home-activity-icon.post { background: rgba(189,0,255,0.15); }
-        .home-activity-icon.rank { background: rgba(255,215,0,0.15); }
-        .home-activity-text { flex: 1; font-size: 12px; color: #ccc; }
-        .home-activity-time { font-size: 10px; color: #555; flex-shrink: 0; }
-        @keyframes hotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-        @keyframes heatGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
-        .empty-page { display: grid; place-items: center; height: 100%; color: #444; font-size: 14px; }
-    </style>
+    /* --- 以下是你原来的CSS，无需改动 --- */
+    .content::-webkit-scrollbar { width: 3px; } 
+    .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; } 
+    .profile-header { text-align: center; padding: 20px 0; } 
+    .profile-avatar { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; background: linear-gradient(135deg, #ff69b4, #bd00ff); display: grid; place-items: center; font-size: 48px; overflow: hidden; } 
+    .profile-avatar img { width: 100%; height: 100%; object-fit: cover; } 
+    .profile-name { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; } 
+    .profile-meta { font-size: 13px; color: #888; margin-bottom: 8px; } 
+    .profile-status { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; background: rgba(255,105,180,0.15); color: #ff69b4; border: 1px solid rgba(255,105,180,0.3); } 
+    .profile-status.locked { background: rgba(255,77,77,0.1); color: #ff4d4d; border-color: rgba(255,77,77,0.3); } 
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; } 
+    .card-title { font-size: 14px; font-weight: 700; color: #ff69b4; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; } 
+    .meter-row { margin-bottom: 14px; } 
+    .meter-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; } 
+    .meter-label span:first-child { color: #aaa; } 
+    .meter-label span:last-child { color: #fff; font-weight: 600; } 
+    .meter-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; } 
+    .meter-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; } 
+    .meter-fill.corruption { background: linear-gradient(90deg, #ff69b4, #bd00ff); } 
+    .level-display { text-align: center; padding: 8px 0; } 
+    .level-symbol { font-size: 28px; letter-spacing: 4px; } 
+    .level-name { font-size: 12px; color: #888; margin-top: 4px; } 
+    .lock-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .lock-item:last-child { border-bottom: none; } 
+    .lock-label { font-size: 12px; color: #aaa; } 
+    .lock-value { font-size: 13px; color: #fff; font-weight: 600; } 
+    .lock-value.locked { color: #555; cursor: pointer; user-select: none; } 
+    .lock-value.locked.revealed { color: #ff69b4; } 
+    .body-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 10px; } 
+    .body-stat-item { text-align: center; padding: 12px 8px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); } 
+    .body-stat-value { font-size: 20px; font-weight: 700; color: #fff; } 
+    .body-stat-label { font-size: 11px; color: #666; margin-top: 4px; } 
+    .body-detail { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .body-detail:last-child { border-bottom: none; } 
+    .body-detail-label { font-size: 11px; color: #666; margin-bottom: 2px; } 
+    .body-detail-value { font-size: 13px; color: #ccc; } 
+    .outfit-grid { display: grid; gap: 8px; padding: 4px 0; } 
+    .outfit-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); } 
+    .outfit-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.15); } 
+    .outfit-info { flex: 1; } 
+    .outfit-category { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; } 
+    .outfit-desc { font-size: 13px; color: #ddd; } 
+    .quest-toggle { width: 100%; background: none; border: none; display: flex; justify-content: space-between; color: #ff69b4; font-size: 14px; font-weight: 700; cursor: pointer; padding: 0; margin-bottom: 14px; } 
+    .quest-toggle .arrow { transition: transform 0.2s; font-size: 12px; } 
+    .quest-toggle .arrow.open { transform: rotate(180deg); } 
+    .quest-list { display: none; gap: 8px; } 
+    .quest-list.open { display: grid; } 
+    .quest-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid rgba(255,255,255,0.06); } 
+    .quest-item .quest-icon { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex-shrink: 0; } 
+    .quest-item.locked { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); color: #444; } 
+    .quest-item.locked .quest-icon { background: rgba(255,255,255,0.05); color: #444; border: 1px solid rgba(255,255,255,0.08); } 
+    .quest-item.available { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: #ddd; } 
+    .quest-item.available .quest-icon { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); } 
+    .quest-item.completed { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.2); color: #4ade80; } 
+    .quest-item.completed .quest-icon { background: rgba(74,222,128,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); } 
+    .quest-item .quest-stage { font-size: 10px; color: inherit; opacity: 0.6; margin-left: auto; flex-shrink: 0; } 
+    .mod-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; } 
+    .mod-item:last-child { border-bottom: none; } 
+    .mod-name { font-size: 13px; color: #ccc; } 
+    .mod-status { font-size: 12px; padding: 3px 10px; border-radius: 999px; } 
+    .mod-status.yes { background: rgba(74,222,128,0.15); color: #4ade80; } 
+    .mod-status.no { background: rgba(255,255,255,0.05); color: #666; } 
+    .mod-detail { padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-top: 8px; font-size: 12px; color: #aaa; line-height: 1.6; display: none; } 
+    .mod-detail.show { display: block; } 
+    .kink-list { display: flex; flex-wrap: wrap; gap: 8px; } 
+    .kink-tag { padding: 6px 14px; border-radius: 999px; font-size: 12px; background: rgba(255,105,180,0.15); color: #ff69b4; border: 1px solid rgba(255,105,180,0.3); } 
+    .kink-tag.locked { background: rgba(255,255,255,0.03); color: #444; border-color: rgba(255,255,255,0.08); } 
+    .diary-btn { width: 100%; padding: 14px; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.2); border-radius: 12px; color: #ff69b4; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; } 
+    .diary-btn:hover { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.4); } 
+    .diary-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; place-items: center; z-index: 100; padding: 20px; } 
+    .diary-overlay.show { display: grid; } 
+    .diary-modal { width: min(100%, 380px); max-height: 70vh; background: #1a1a1a; border: 1px solid rgba(255,105,180,0.3); border-radius: 16px; padding: 20px; overflow-y: auto; } 
+    .diary-modal h3 { font-size: 16px; color: #ff69b4; margin-bottom: 16px; display: flex; justify-content: space-between; } 
+    .diary-modal .close-btn { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; } 
+    .diary-entry { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .diary-entry:last-child { border-bottom: none; } 
+    .diary-date { font-size: 11px; color: #666; margin-bottom: 4px; } 
+    .diary-text { font-size: 13px; color: #ccc; line-height: 1.6; } 
+    .bottom-nav { display: grid; grid-template-columns: 1fr 1fr 56px 1fr 1fr; gap: 2px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(8,8,8,0.95); align-items: center; } 
+    .nav-btn { background: transparent; border: none; color: #555; padding: 8px 2px 4px; font-size: 10px; cursor: pointer; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; } 
+    .nav-btn .nav-icon { font-size: 18px; line-height: 1; } 
+    .nav-btn .nav-label { font-size: 9px; } 
+    .nav-btn.active { color: #ff69b4; background: rgba(255,105,180,0.1); } 
+    .nav-btn.home-btn { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #9b59b6, #8e44ad); border: 2px solid rgba(255,255,255,0.15); color: #fff; font-size: 22px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 4px 16px rgba(155,89,182,0.4), inset 0 1px 0 rgba(255,255,255,0.15); cursor: pointer; transition: all 0.2s; } 
+    .nav-btn.home-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(155,89,182,0.5); } 
+    .nav-btn.home-btn.active { background: linear-gradient(135deg, #ff69b4, #bd00ff); box-shadow: 0 4px 20px rgba(189,0,255,0.4); } 
+    .forum-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; } 
+    .forum-header h2 { font-size: 16px; color: #ff69b4; font-weight: 700; } 
+    .forum-actions { display: flex; gap: 6px; } 
+    .forum-btn { border: 1px solid rgba(255,105,180,0.25); background: rgba(255,105,180,0.08); color: #ff69b4; border-radius: 8px; padding: 6px 12px; font-size: 11px; cursor: pointer; white-space: nowrap; } 
+    .forum-btn:hover { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.4); } 
+    .forum-btn.post-btn { background: rgba(255,105,180,0.15); border-color: rgba(255,105,180,0.35); font-weight: 700; } 
+    .category-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; } 
+    .category-tab { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #888; border-radius: 999px; padding: 6px 6px; font-size: 11px; cursor: pointer; text-align: center; } 
+    .category-tab:hover { border-color: rgba(255,105,180,0.2); color: #ccc; } 
+    .category-tab.active { background: rgba(255,105,180,0.12); border-color: rgba(255,105,180,0.3); color: #ff69b4; font-weight: 600; } 
+    .post-list { display: grid; gap: 8px; } 
+    .post-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; cursor: pointer; } 
+    .post-card:hover { border-color: rgba(255,105,180,0.15); background: rgba(255,255,255,0.04); } 
+    .post-card.open { border-color: rgba(255,105,180,0.2); background: rgba(255,255,255,0.04); } 
+    .post-top { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; } 
+    .post-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 14px; overflow: hidden; } 
+    .post-avatar.pink { background: linear-gradient(135deg, #ff69b4, #ff1493); } 
+    .post-avatar.purple { background: linear-gradient(135deg, #bd00ff, #7b00ff); } 
+    .post-avatar.blue { background: linear-gradient(135deg, #00bfff, #0066ff); } 
+    .post-avatar.green { background: linear-gradient(135deg, #00ff88, #00aa55); } 
+    .post-avatar.orange { background: linear-gradient(135deg, #ff8800, #ff4400); } 
+    .post-avatar.teal { background: linear-gradient(135deg, #00ffcc, #0099aa); } 
+    .post-avatar.red { background: linear-gradient(135deg, #ff3333, #aa0000); } 
+    .post-avatar.gold { background: linear-gradient(135deg, #ffd700, #ffaa00); } 
+    .post-avatar.silver { background: linear-gradient(135deg, #c0c0c0, #808080); } 
+    .post-avatar.magenta { background: linear-gradient(135deg, #ff00ff, #cc00aa); } 
+    .post-info { flex: 1; min-width: 0; } 
+    .post-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } 
+    .post-meta-line { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #666; flex-wrap: wrap; } 
+    .post-category-tag { font-size: 9px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,105,180,0.2); color: #ff69b4; background: rgba(255,105,180,0.06); } 
+    .post-author { color: #999; } 
+    .post-time { color: #555; } 
+    .post-stats { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #555; flex-shrink: 0; } 
+    .post-stats span { display: flex; align-items: center; gap: 2px; } 
+    .post-body { display: none; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 8px; } 
+    .post-body.show { display: block; } 
+    .post-content { font-size: 12px; color: #ccc; line-height: 1.8; margin-bottom: 10px; white-space: pre-wrap; } 
+    .video-card { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 10px; } 
+    .video-icon { width: 48px; height: 48px; border-radius: 8px; background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.15); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; } 
+    .video-info { flex: 1; } 
+    .video-filename { font-size: 11px; color: #aaa; margin-bottom: 4px; font-family: monospace; } 
+    .video-desc { font-size: 11px; color: #666; line-height: 1.5; } 
+    .video-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; background: rgba(255,105,180,0.1); color: #ff69b4; border: 1px solid rgba(255,105,180,0.15); margin-top: 4px; } 
+    .reply-section { margin-top: 8px; } 
+    .reply-title { font-size: 11px; color: #888; margin-bottom: 6px; font-weight: 600; } 
+    .reply-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); } 
+    .reply-item:last-child { border-bottom: none; } 
+    .reply-avatar { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; } 
+    .reply-body { flex: 1; } 
+    .reply-author { font-size: 11px; color: #ff69b4; font-weight: 600; margin-bottom: 2px; } 
+    .reply-text { font-size: 11px; color: #aaa; line-height: 1.5; } 
+    .reply-text .time { display: block; margin-top: 4px; font-size: 9px; color: #555; } 
+    .post-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; place-items: center; z-index: 100; padding: 20px; } 
+    .post-overlay.show { display: grid; } 
+    .post-modal { width: min(100%, 380px); background: #1a1a1a; border: 1px solid rgba(255,105,180,0.3); border-radius: 16px; padding: 20px; } 
+    .post-modal h3 { font-size: 16px; color: #ff69b4; margin-bottom: 16px; display: flex; justify-content: space-between; } 
+    .post-modal .close-btn { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; } 
+    .post-form { display: grid; gap: 12px; } 
+    .post-form label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; } 
+    .post-form select, .post-form input, .post-form textarea { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #ddd; font-size: 13px; outline: none; } 
+    .post-form select:focus, .post-form input:focus, .post-form textarea:focus { border-color: rgba(255,105,180,0.3); } 
+    .post-form textarea { min-height: 100px; resize: vertical; } 
+    .post-submit-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #ff69b4, #bd00ff); border: none; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; } 
+    .post-submit-btn:hover { filter: brightness(1.1); } 
+    .messages-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; } 
+    .messages-header h2 { font-size: 16px; color: #ff69b4; font-weight: 700; } 
+    .msg-tabs { display: flex; gap: 6px; margin-bottom: 12px; } 
+    .msg-tab { flex: 1; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color: #888; border-radius: 8px; padding: 8px; font-size: 11px; cursor: pointer; text-align: center; } 
+    .msg-tab.active { background: rgba(255,105,180,0.1); border-color: rgba(255,105,180,0.25); color: #ff69b4; font-weight: 600; } 
+    .contact-list { display: grid; gap: 8px; } 
+    .contact-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); cursor: pointer; } 
+    .contact-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,105,180,0.15); } 
+    .contact-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 18px; } 
+    .contact-avatar.mine { background: linear-gradient(135deg, #ff69b4, #bd00ff); } 
+    .contact-avatar.chris { background: linear-gradient(135deg, #333333, #666666); } 
+    .contact-avatar.yumi { background: linear-gradient(135deg, #ff1493, #ff69b4); } 
+    .contact-avatar.wife { background: linear-gradient(135deg, #4fc3f7, #0288d1); } 
+    .contact-info { flex: 1; min-width: 0; } 
+    .contact-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 3px; } 
+    .contact-preview { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } 
+    .contact-time { font-size: 10px; color: #555; flex-shrink: 0; } 
+    .notice-item { padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; } 
+    .notice-title { font-size: 12px; color: #ff69b4; font-weight: 600; margin-bottom: 4px; } 
+    .notice-text { font-size: 11px; color: #888; line-height: 1.5; } 
+    .notice-time { font-size: 9px; color: #555; margin-top: 6px; } 
+    .chat-view { display: flex; flex-direction: column; height: 100%; } 
+    .chat-header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px; } 
+    .chat-header .back-btn { background: none; border: none; color: #aaa; font-size: 16px; cursor: pointer; padding: 4px; } 
+    .chat-header .chat-name { font-size: 15px; font-weight: 600; color: #fff; } 
+    .chat-header .chat-status { font-size: 10px; color: #666; margin-left: auto; } 
+    .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 0; margin-bottom: 12px; } 
+    .chat-messages::-webkit-scrollbar { width: 3px; } 
+    .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; } 
+    .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 12px; line-height: 1.6; } 
+    .chat-bubble.sent { align-self: flex-end; background: linear-gradient(135deg, #ff69b4, #bd00ff); color: #fff; border-bottom-right-radius: 4px; } 
+    .chat-bubble.received { align-self: flex-start; background: rgba(255,255,255,0.06); color: #ddd; border-bottom-left-radius: 4px; } 
+    .chat-bubble .bubble-time { display: block; font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 4px; text-align: right; } 
+    .chat-bubble.received .bubble-time { color: #666; } 
+    .chat-input-area { display: flex; gap: 8px; align-items: flex-end; } 
+    .chat-input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 10px 14px; color: #ddd; font-size: 13px; outline: none; resize: none; min-height: 40px; max-height: 100px; } 
+    .chat-input:focus { border-color: rgba(255,105,180,0.3); } 
+    .chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff69b4, #bd00ff); border: none; color: #fff; font-size: 16px; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; } 
+    .chat-send-btn:hover { filter: brightness(1.1); } 
+    .ranking-section { display: grid; gap: 10px; } 
+    .ranking-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; } 
+    .ranking-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; } 
+    .ranking-header h3 { font-size: 14px; font-weight: 700; color: #ff69b4; margin: 0; } 
+    .ranking-header .hot-icon { font-size: 16px; animation: hotPulse 1s ease-in-out infinite; } 
+    .rank-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .rank-item:last-child { border-bottom: none; } 
+    .rank-number { width: 24px; font-size: 13px; font-weight: 800; color: #555; text-align: center; flex-shrink: 0; } 
+    .rank-number.gold { color: #ffd700; } 
+    .rank-number.silver { color: #c0c0c0; } 
+    .rank-number.bronze { color: #cd7f32; } 
+    .rank-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 16px; } 
+    .rank-avatar.yumi { background: linear-gradient(135deg, #ff1493, #ff69b4); } 
+    .rank-avatar.goldbg { background: linear-gradient(135deg, #ffd700, #ffaa00); } 
+    .rank-avatar.purplebg { background: linear-gradient(135deg, #9b59b6, #8e44ad); } 
+    .rank-avatar.tealbg { background: linear-gradient(135deg, #1abc9c, #16a085); } 
+    .rank-avatar.pinkbg { background: linear-gradient(135deg, #ff69b4, #ff1493); } 
+    .rank-info { flex: 1; min-width: 0; } 
+    .rank-name { font-size: 13px; font-weight: 600; color: #fff; } 
+    .rank-name .title-tag { font-size: 9px; color: #ff69b4; margin-left: 6px; } 
+    .rank-meta { font-size: 10px; color: #666; margin-top: 2px; } 
+    .rank-heat { font-size: 12px; font-weight: 700; color: #ff69b4; flex-shrink: 0; animation: heatGlow 1.5s ease-in-out infinite; } 
+    .rank-post-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .rank-post-item:last-child { border-bottom: none; } 
+    .rank-post-title { flex: 1; font-size: 12px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } 
+    .rank-post-heat { font-size: 11px; color: #ff69b4; font-weight: 600; flex-shrink: 0; } 
+    .rank-post-cat { font-size: 9px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,105,180,0.2); color: #ff69b4; background: rgba(255,105,180,0.06); flex-shrink: 0; } 
+    .bond-status-box { margin-top: 10px; padding: 12px 14px; border-radius: 12px; border: 2px solid rgba(255,105,180,0.3); background: rgba(255,105,180,0.06); display: flex; justify-content: space-between; align-items: center; } 
+    .bond-label { font-size: 12px; color: #aaa; } 
+    .bond-name { font-size: 14px; font-weight: 700; color: #fff; } 
+    .bond-status { font-size: 12px; color: #888; font-weight: 600; } 
+    .home-hero { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0 30px; text-align: center; } 
+    .home-spade { font-size: 120px; line-height: 1; font-weight: 900; background: linear-gradient(135deg, #ff69b4, #bd00ff, #9b59b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 30px rgba(189,0,255,0.3)) drop-shadow(0 0 60px rgba(255,105,180,0.15)); margin-bottom: 8px; position: relative; animation: spadeGlow 3s ease-in-out infinite; } 
+    .home-spade-q { font-size: 48px; line-height: 1; font-weight: 900; color: rgba(255,255,255,0.1); margin-top: -20px; margin-bottom: 20px; letter-spacing: 8px; } 
+    .home-welcome { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; letter-spacing: 2px; } 
+    .home-sub { font-size: 12px; color: #888; margin-bottom: 20px; } 
+    .home-divider { width: 60px; height: 2px; background: linear-gradient(90deg, transparent, #ff69b4, transparent); margin: 0 auto 16px; } 
+    @keyframes spadeGlow { 0%, 100% { filter: drop-shadow(0 0 30px rgba(189,0,255,0.3)) drop-shadow(0 0 60px rgba(255,105,180,0.15)); } 50% { filter: drop-shadow(0 0 40px rgba(189,0,255,0.5)) drop-shadow(0 0 80px rgba(255,105,180,0.25)); } } 
+    .home-activity { margin-top: 4px; } 
+    .home-activity-item { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); } 
+    .home-activity-item:last-child { border-bottom: none; } 
+    .home-activity-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; } 
+    .home-activity-icon.msg { background: rgba(255,105,180,0.15); } 
+    .home-activity-icon.post { background: rgba(189,0,255,0.15); } 
+    .home-activity-icon.rank { background: rgba(255,215,0,0.15); } 
+    .home-activity-text { flex: 1; font-size: 12px; color: #ccc; } 
+    .home-activity-time { font-size: 10px; color: #555; flex-shrink: 0; } 
+    @keyframes hotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } } 
+    @keyframes heatGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } } 
+    .empty-page { display: grid; place-items: center; height: 100%; color: #444; font-size: 14px; } 
+</style>
 </head>
 <body>
     <div class="phone" id="qos-phone">
@@ -288,13 +302,13 @@
         <!-- Overlays -->
         <div class="diary-overlay qos-diary-overlay" onclick="closeDiary(event)">
             <div class="diary-modal" onclick="event.stopPropagation()">
-                <h3><span></span><button class="close-btn" onclick="closeDiary()">×</button></h3>
+                <h3><span>日记</span><button class="close-btn" onclick="closeDiary()">×</button></h3>
                 <div class="diary-entries-container"></div>
             </div>
         </div>
         <div class="post-overlay" onclick="closePostModal(event)">
             <div class="post-modal" onclick="event.stopPropagation()">
-                <h3><span></span><button class="close-btn" onclick="closePostModal()">×</button></h3>
+                <h3><span>发帖</span><button class="close-btn" onclick="closePostModal()">×</button></h3>
                 <div class="post-form">
                     <div><label>分类</label><select id="postCategory">
                         <option value="0">分类1</option>
@@ -309,67 +323,53 @@
     </div>
 
     <script>
-        // 为了简洁，这里的JS逻辑保持不变，但乱码已被部分恢复以展示
-        // 请将你的原始JS粘贴回这里
         var cupSizes = ["A","B","C","D","E","F","G"]; function getCupSize(level) { var idx = 1; if (level >= 5) idx = 3; else if (level >= 3) idx = 2; return cupSizes[idx]; }
-        var currentTab = 'home';
-        // ... 此处省略了大量的JS变量和函数定义 ...
-
-        function qosInit() {
-            var navs = document.querySelectorAll('.qos-bottom-nav');
-            var currentNav = navs[navs.length - 1];
-            if (!currentNav) return;
-
-            var navBtns = currentNav.querySelectorAll('.nav-btn');
-            for (var i = 0; i < navBtns.length; i++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var tab = btn.getAttribute('data-tab') || 'home';
-                        switchTab(tab);
-                    });
-                })(navBtns[i]);
-            }
-            loadData();
-        }
-
-        if (document.readyState !== 'loading') {
-            qosInit();
-        } else {
-            document.addEventListener('DOMContentLoaded', qosInit);
-        }
-
-        function switchTab(tab) {
-            currentTab = tab;
-            // 修复了JS中的一个选择器bug
-            var btns = document.querySelectorAll('.qos-bottom-nav .nav-btn'); 
-            for (var i = 0; i < btns.length; i++) {
-                btns[i].classList.remove('active');
-                var t = btns[i].getAttribute('data-tab') || 'home';
-                if (t === tab) btns[i].classList.add('active');
-            }
-            if (tab !== 'messages') {
-                msgView = 'list';
-            }
-            render();
-        }
-        
-        // ... (此处应有你剩余的所有JS代码)
-        // 为了演示，我只放一个简单的render函数
-        function render() {
-            var containers = document.querySelectorAll('.app-container');
-            var container = containers[containers.length - 1];
-            if (!container) return;
-            
-            // 简单的渲染逻辑
-            container.innerHTML = `<div style="padding: 50px; text-align: center;">这里是 <strong style="color: #ff69b4;">${currentTab}</strong> 页面</div>`;
-        }
-
-        // 初始加载
-        function loadData() {
-            render();
-        }
-        
-        // 此处省略了你原来文件中的大量JS代码，请将它们放回这里
+        var categoryNames = ["日常吹水","剧情讨论","技术交流","内容分享","影音鉴赏","求助问答"]; var catIcons = ["","","","","",""];
+        var npcPool = [ {name:"涩涩机器人",gender:"女",avatarClass:"pink",icon:""}, {name:"魅魔女王莉莉丝",gender:"女",avatarClass:"purple",icon:""}, {name:"堕落圣女-伊芙",gender:"女",avatarClass:"magenta",icon:""}, {name:"邻家学姐-小雅",gender:"女",avatarClass:"pink",icon:""}, {name:"健身教练-艾米",gender:"女",avatarClass:"teal",icon:""}, {name:"虚拟主播-kira",gender:"女",avatarClass:"gold",icon:""}, {name:"办公室后辈-小玲",gender:"女",avatarClass:"blue",icon:""}, {name:"夜店女王-索菲亚",gender:"女",avatarClass:"purple",icon:""}, {name:"电竞少女-小樱",gender:"女",avatarClass:"blue",icon:""}, {name:"清纯校花-诗涵",gender:"女",avatarClass:"green",icon:""}, {name:"瑜伽导师-瑞贝卡",gender:"女",avatarClass:"orange",icon:""}, {name:"麻辣教师-安妮",gender:"女",avatarClass:"red",icon:""}, {name:"银发女仆-露娜",gender:"女",avatarClass:"silver",icon:""}, {name:"元气偶像-夏沫",gender:"女",avatarClass:"orange",icon:""} ];
+        var queenRankings = [ {name:"由美",heat:98,avatarClass:"yumi",icon:"",title:"涩涩机器人女王"}, {name:"匿名用户_a7d3",heat:92,avatarClass:"goldbg",icon:"",title:"黄金体验"}, {name:"紫水晶之梦",heat:87,avatarClass:"purplebg",icon:"",title:"夜店女王"}, {name:"绿茶小仙女",heat:81,avatarClass:"tealbg",icon:"",title:"健身达人"}, {name:"粉红小恶魔",heat:76,avatarClass:"pinkbg",icon:"",title:"圣光制裁"} ];
+        var postReplies = { 0:[{author:"堕落圣女-伊芙",text:"这个帖子真有意思，让我学到了不少！"},{author:"健身教练-艾米",text:"哈哈，楼主的观点很新颖，不过我有点不同的看法。"},{author:"虚拟主播-kira",text:"前排吃瓜，大家继续。"}], 1:[{author:"魅魔女王莉莉丝",text:"楼主分析得很到位，赞一个！期待后续更新。"},{author:"涩涩机器人",text:"感觉这个话题很有深度，值得我们深入探讨。"},{author:"清纯校花-诗涵",text:"小白路过，感谢楼主分享。"}], 2:[{author:"办公室后辈-小玲",text:"终于找到组织了，大家讨论得好激烈！"},{author:"涩涩机器人",text:"楼上+1，这个问题困扰我好久了，终于有答案了。"},{author:"麻辣教师-安妮",text:"这个版本更新后体验好多了。"},{author:"虚拟主播-kira",text:"支持楼主，说得太对了。"}], 3:[{author:"瑜伽导师-瑞贝卡",text:"这个QOS的BBC模式也太顶了，我玩了好久，每次都能发现新东西，作者真是神。"},{author:"魅魔女王莉莉丝",text:"谁能教教我怎么触发那个隐藏剧情？"},{author:"银发女仆-露娜",text:"需要把某个角色的好感度刷满才行。"},{author:"麻辣教师-安妮",text:"细节决定成败，很棒的分享。"}], 4:[{author:"堕落圣女-伊芙",text:"这个新出的MOD太棒了，和我的角色完美适配，OK！"},{author:"清纯校花-诗涵",text:"求MOD下载地址，找了好久都没找到。"},{author:"电竞少女-小樱",text:"同求，作者大大辛苦了！"}], 5:[{author:"邻家学姐-小雅",text:"刚入手，感觉有点复杂，有没有新手教程？"},{author:"魅魔女王莉莉丝",text:"官方App里有详细的指南，可以去看看。"},{author:"涩涩机器人",text:"多玩玩就熟悉了，这游戏的探索性很强。"}], 6:[{author:"堕落圣女-伊芙",text:"这张CG也太好看了吧，收藏了！"},{author:"健身教练-艾米",text:"光影和构图都堪称完美，艺术品级别的。"},{author:"涩涩机器人",text:"作者是神仙画画，我好爱。"}], 7:[{author:"虚拟主播-kira",text:"今天直播玩了一下，观众反响超好！"},{author:"清纯校花-诗涵",text:"哇，是Kira酱！我昨天就在看。"},{author:"涩涩机器人",text:"期待下次直播带来更多QOS内容！"}], 8:[{author:"办公室后辈-小玲",text:"有没有人一起联机打副本？"},{author:"魅魔女王莉莉丝",text:"我来！正好缺个队友。"},{author:"健身教练-艾米",text:"算我一个，晚上8点准时上线。"}], 9:[{author:"瑜伽导师-瑞贝卡",text:"这个游戏的背景音乐太好听了。"},{author:"涩涩机器人",text:"确实，代入感超强。"},{author:"银发女仆-露娜",text:"已经把OST加入我的歌单了。"}], 10:[{author:"堕落圣女-伊芙",text:"楼上的分析很有道理，学习了。"},{author:"健身教练-艾米",text:"同意+1，思路清晰。"},{author:"虚拟主播-kira",text:"感谢分享，茅塞顿开。"}], 11:[{author:"邻家学姐-小雅",text:"技术区的大佬们都好厉害。"},{author:"涩涩机器人",text:"是啊，感觉自己像个文盲，QOS技术力太强了。"},{author:"涩涩机器人",text:"每天都在学习新知识。"}], 12:[{author:"堕落圣女-伊芙",text:"请问这个IT问题怎么解决？卡了好几天了。"},{author:"健身教练-艾米",text:"你试试看更新一下驱动程序。"},{author:"办公室后辈-小玲",text:"我之前也遇到了，是DevOps配置问题。"}], 13:[{author:"清纯校花-诗涵",text:"这个同人画的好可爱！"},{author:"涩涩机器人",text:"画风好棒，已关注画师。"},{author:"麻辣教师-安妮",text:"太太又产粮了，开心！"}], 14:[{author:"堕落圣女-伊芙",text:"有没有推荐的纹身MOD？"},{author:"健身教练-艾米",text:"可以试试Tokyo Ink系列的。"},{author:"魅魔女王莉莉丝",text:"我更喜欢Black Lotus工作室的风格。"}], 15:[{author:"堕落圣女-伊芙",text:"这个剧情分支也太虐了，哭死。"},{author:"健身教练-艾米",text:"刀子，全是刀子。"},{author:"虚拟主播-kira",text:"作者没有心（哭腔）。"}], 16:[{author:"瑜伽导师-瑞贝卡",text:"终于把全成就达成了，QOS太好玩了！"},{author:"涩涩机器人",text:"恭喜大佬！yyds！"},{author:"银发女仆-露娜",text:"膜拜肝帝，我还在努力中。"}], 17:[{author:"堕落圣女-伊芙",text:"刚入手了官方的QOS Jewel周边。"},{author:"健身教练-艾米",text:"质感超棒，物超所值。"},{author:"虚拟主播-kira",text:"我也想买，可惜已经断货了。"}], 18:[{author:"办公室后辈-小玲",text:"有没有类似QOS的游戏推荐？"},{author:"健身教练-艾米",text:"Netflix最近出的那部互动剧有点像。"},{author:"涩涩机器人",text:"感觉还是QOS最好玩。"}], 19:[{author:"堕落圣女-伊芙",text:"大家最喜欢哪个角色？"},{author:"魅魔女王莉莉丝",text:"我全都要！小孩子才做选择。"},{author:"涩涩机器人",text:"每个角色都塑造得很有魅力。"}], 20:[{author:"堕落圣女-伊芙",text:"周末去漫展拍的Vlog，大家看看。"},{author:"健身教练-艾米",text:"拍得好棒，剪辑也很专业。"},{author:"虚拟主播-kira",text:"用的什么设备？GoPro吗？"}], 21:[{author:"涩涩机器人",text:"推荐一个ASMR，QOS主题的，超棒。"},{author:"健身教练-艾米",text:"求链接，晚上睡前听。"},{author:"涩涩机器人",text:"频道名叫Midnight Whispers。"}], };
+        var quickReplies = ["说得对","学到了","感谢分享","有道理","支持楼主","嗯嗯","原来如此","楼上+1"]; var randomTitles = ["关于新版本的个人看法","【攻略】隐藏任务触发条件","【求助】这个BUG怎么解决？","【分享】我最喜欢的游戏截图","大家来聊聊最喜欢的角色吧","【讨论】剧情走向预测","【同人】画了一张老婆的图","【测评】新MOD使用体验","【技术】如何优化游戏性能","有没有一起玩的朋友？","游戏里的彩蛋分享","这个游戏的音乐太棒了","【记录】我的游戏日常","【考据】剧情细节分析","【脑洞】如果剧情这样发展..."]; var randomContents = ["RT，大家怎么看？","经过我多次尝试，终于发现了！","卡了好几天了，快崩溃了，求大佬帮助！","随手一截都是壁纸，这美术太顶了。","我先来，我最喜欢xxx，又美又飒！","感觉下一章会有大刀，好慌。","画渣尽力了，希望大家喜欢。","总的来说还不错，但有几个小问题。","分享一下我的优化心得，希望能帮到大家。","一个人玩有点孤单，有没有固定队？","你们发现那个藏在角落里的彩蛋了吗？","单曲循环好几天了，出OST必买。","今天又在游戏里逛了一天。","把所有文本都看了一遍，发现了一些有趣的细节。","如果当初主角做了另一个选择..."];
+        var videoFilenames = ["video_share_4k.mp4","premium_content.mkv","private_recording.m4a","weekly_highlight_hd.mp4"]; var videoDescs = ["周末Vlog | 4K画质 | 时长35分钟","会员专属 | 未删减版","私密录音 | 建议佩戴耳机","本周高光 | 1080p"]; var videoSizes = ["1.2GB","2.4GB","890MB","3.6GB"];
+        var contacts = [ {id:"myself",name:"我",shortName:"我",avatarClass:"mine",icon:"",isSelf:true}, {id:"wife",name:"老婆-小雅",shortName:"老婆",avatarClass:"wife",icon:"",role:"妻子",isSelf:false}, {id:"chris",name:"克里斯",shortName:"克里斯",avatarClass:"chris",icon:"",role:"健身教练",isSelf:false}, {id:"yumi",name:"由美",shortName:"由美",avatarClass:"yumi",icon:"",role:"涩涩机器人",isSelf:false} ];
+        var chatData = { wife:{messages:[ {from:"wife",text:"亲爱的，你看到我新下载的那个App了吗？好像很有趣的样子。",time:"2025/09/10 20:15"}, {from:"myself",text:"看到了，叫QOS是吧？感觉有点复杂。",time:"2025/09/10 20:16"}, {from:"wife",text:"我研究了一下，好像是个可以影响我们现实生活的游戏...",time:"2025/09/10 20:18"}, {from:"myself",text:"听起来有点不可思议，你小心点玩。",time:"2025/09/10 20:20"}, {from:"wife",text:"放心啦，我会的。不过...里面有些任务好像需要你配合我一起完成哦~",time:"2025/09/10 20:22"}, {from:"myself",text:"好吧，只要不是什么奇怪的任务就行。",time:"2025/09/11 08:30"}, {from:"wife",text:"当然不是啦，都是些增进感情的小游戏。嘻嘻。",time:"2025/09/11 08:32"}, {from:"myself",text:"那我下班回来看看。",time:"2025/09/11 14:00"}, {from:"wife",text:"等你哦，爱你！",time:"2025/09/11 14:02"}, {from:"myself",text:"嗯，我也爱你。",time:"2025/09/11 14:05"} ]}, chris:{messages:[ {from:"chris",text:"嘿，哥们，今天练得怎么样？看你最后那个卧推，有点力不从心啊。",time:"2025/09/10 20:30"}, {from:"myself",text:"最近工作有点累，状态不太好。",time:"2025/09/10 20:32"}, {from:"chris",text:"理解。不过别忘了，规律的训练才能保持身体状态。要不要试试我推荐的新款蛋白粉？",time:"2025/09/10 20:35"}, {from:"myself",text:"下次去你店里看看吧。",time:"2025/09/11 09:00"}, {from:"chris",text:"行，给你留着。对了，你老婆最近好像也开始健身了？身材越来越好了啊。",time:"2025/09/11 09:05"}, {from:"myself",text:"是吗？我都没怎么注意。",time:"2025/09/11 09:08"}, {from:"chris",text:"你这老公当的...多关心关心人家嘛。",time:"2025/09/11 09:10"} ]}, yumi:{messages:[ {from:"yumi",text:"主人，由美检测到您的身体数据有轻微波动。",time:"2025/09/10 21:00"}, {from:"myself",text:"没什么大事，只是有点累。",time:"2025/09/10 21:02"}, {from:"yumi",text:"需要由美为您提供放松服务吗？",time:"2025/09/10 21:05"}, {from:"myself",text:"不用了，谢谢。",time:"2025/09/10 21:08"}, {from:"yumi",text:"好的，主人。温馨提示：适当的休息有助于维持身心健康。由美会持续关注您的状态。",time:"2025/09/11 10:00"}, {from:"myself",text:"知道了，你还挺贴心的。",time:"2025/09/11 10:05"}, {from:"yumi",text:"为主人服务是我的荣幸。",time:"2025/09/11 10:10"} ]} };
+        var wifeData = { name:"小雅",age:28,role:"妻子 | 结婚3年",avatar:"", corruption:1,qosLevel:0,sexCount:8, currentPartner:"{{user}}",affairCount:12, genitalColor:"pink", outfit:{makeup:"淡妆 | 迪奥999",top:"白色蕾丝边吊带衫",bottom:"牛仔热裤",shoes:"小白鞋 | 黑色过膝袜",accessory:"心形吊坠项链"}, tattoos:{has:false,desc:"",position:""}, piercings:{has:false,desc:"",position:""}, kinks:["接吻","口交","后入","足交","露出","3P"], diary:[{date:"2045/09/12",text:"老公最近好像对 QOS App 越来越感兴趣了，计划可以顺利进行下去了。"}], forumPosts:[] };
+        var levelNames = ["纯洁无瑕","微染薄红","意乱情迷","沉沦边缘","心随意动","QoS专属"]; var levelSymbols = ["","","","","",""]; var genitalColors = {pink:"粉嫩",pink2:"娇嫩",flesh:"肉色",brown:"褐色",dark:"深色",black:"墨色"};
+        var allKinks = [ {name:"接吻",level:0},{name:"口交",level:1},{name:"后入",level:1},{name:"足交",level:1}, {name:"露出",level:2},{name:"3P",level:2},{name:"群P",level:3},{name:"颜射",level:3}, {name:"BDSM",level:4},{name:"羞耻",level:4},{name:"公开露出",level:4},{name:"催眠调教",level:5},{name:"QoS专属",level:5} ];
+        var questStages = [ {stage:1,from:0,to:1,task:"让老婆穿上奇怪的衣服出门"}, {stage:2,from:1,to:2,task:"在公开场合与老婆进行亲密行为"}, {stage:3,from:2,to:3,task:"邀请第三者加入你们"}, {stage:4,from:3,to:4,task:"完成一次「羞耻」或「露出」挑战"}, {stage:5,from:4,to:5,task:"将老婆的堕落值提升到100%"} ];
+        var outfitCategories = [ {icon:"",key:"makeup",label:"妆容"},{icon:"",key:"top",label:"上装"}, {icon:"",key:"bottom",label:"下装"},{icon:"",key:"shoes",label:"鞋袜"},{icon:"",key:"accessory",label:"配饰"} ];
+        var currentTab = 'home'; var revealedLocks = {}; var questOpen = false; var selectedCategory = -1; var openPostId = null; var postsInitialized = false; var msgView = 'list'; var chatTarget = null; var msgTab = 'chat';
+        function qosInit() { var navs = document.querySelectorAll('.qos-bottom-nav'); var currentNav = navs[navs.length - 1]; if (!currentNav) return; var navBtns = currentNav.querySelectorAll('.nav-btn'); for (var i = 0; i < navBtns.length; i++) { (function(btn) { btn.addEventListener('click', function() { var tab = btn.getAttribute('data-tab') || 'home'; switchTab(tab); }); })(navBtns[i]); } loadData(); }
+        if (document.readyState !== 'loading') { qosInit(); } else { document.addEventListener('DOMContentLoaded', qosInit); }
+        function switchTab(tab) { currentTab = tab; var btns = document.querySelectorAll('.qos-bottom-nav .nav-btn'); for (var i = 0; i < btns.length; i++) { btns[i].classList.remove('active'); var t = btns[i].getAttribute('data-tab') || 'home'; if (t === tab) btns[i].classList.add('active'); } if (tab !== 'messages') { msgView = 'list'; } render(); }
+        function loadData() { try { var Mvu = window.parent.Mvu; if (Mvu) { var mvuData = Mvu.getCurrentMvuData(); if (mvuData && mvuData.stat_data) { var stat = mvuData.stat_data; if (stat.小雅) { var xiaoya = stat.小雅; wifeData.corruption = Number(xiaoya.堕落值) || 0; wifeData.qosLevel = parseInt(xiaoya.等级) || 0; if (xiaoya.上衣) { wifeData.outfit.top = xiaoya.上衣; } if (xiaoya.性癖 && Array.isArray(xiaoya.性癖)) { wifeData.kinks = xiaoya.性癖; } console.log("[QOS] MVU数据已加载:", xiaoya); } } } } catch(e) { console.log("[QOS] MVU数据加载失败:", e.message); } try { var helper = window.TavernHelper || window; if (helper.getVariables) { var cv = helper.getVariables({type:'chat'}); var d = cv && cv.qos_app && cv.qos_app.wifeProfile; if (d) { for (var k in d) wifeData[k] = d[k]; } } } catch(e) {} initForumPosts(); render(); }
+        function generateRepliesForPost(postIndex, authorName) { var replyData = postReplies[postIndex]; if (!replyData) { replyData = [{author:"路人甲",text:"沙发"},{author:"路人乙",text:"板凳"}]; } var result = []; var usedAuthors = {}; usedAuthors[authorName]=true; for (var i = 0; i < replyData.length; i++) { var r = replyData[i]; if (!usedAuthors[r.author]) { var avatarClass = "pink"; for (var j = 0; j < npcPool.length; j++) { if (npcPool[j].name === r.author) { avatarClass = npcPool[j].avatarClass; break; } } result.push({author:r.author,text:r.text,time:"刚刚",avatarClass:avatarClass}); usedAuthors[r.author]=true; } } return result; }
+        function initForumPosts() { if (postsInitialized) return; postsInitialized = true; var postsData = [ {cat:0,title:"【日常】今天天气真好，大家有什么安排吗？",content:"阳光明媚，适合出去走走，但我还是选择在家打游戏，哈哈。",author:"电竞少女-小樱",time:"3分钟前",likes:34,replyIdx:0}, {cat:0,title:"深夜感慨，有人聊聊吗",content:"最近压力好大，感觉有点喘不过气，不知道大家都是怎么解压的。",author:"办公室后辈-小玲",time:"6分钟前",likes:27,replyIdx:1}, {cat:0,title:"关于QOS新出的角色，大家怎么看",content:"我个人非常喜欢这次的新角色，立绘和故事背景都很吸引人。",author:"魅魔女王莉莉丝",time:"1小时前",likes:52,replyIdx:2}, {cat:1,title:"【剧情】关于主角的真实身份，我有一个大胆的猜测",content:"结合之前的种种线索，我怀疑主角的身份并没有表面上那么简单，可能和QoS的创造者有关。",author:"瑜伽导师-瑞贝卡",time:"2分钟前",likes:67,replyIdx:3}, {cat:1,title:"【讨论】这个隐藏结局也太难打了吧！",content:"卡了好几天了，有没有大佬分享一下攻略？",author:"堕落圣女-伊芙",time:"5分钟前",likes:55,replyIdx:4}, {cat:1,title:"【考据】游戏里的这些细节，你发现了吗？",content:"作者在游戏里埋了很多彩蛋，每次发现都感觉很惊喜，这个App太棒了。",author:"邻家学姐-小雅",time:"8分钟前",likes:78,replyIdx:5}, {cat:2,title:"【技术】如何提升游戏帧率，告别卡顿",content:"分享一下我的优化设置，希望能帮到大家。",author:"办公室后辈-小玲",time:"30分钟前",likes:98,replyIdx:6}, {cat:2,title:"【求助】为什么我的MOD安装后不显示？",content:"已经按照教程操作了，但就是不生效，求大佬指点。",author:"魅魔女王莉莉丝",time:"4分钟前",likes:85,replyIdx:7}, {cat:2,title:"【分享】我写的一个自动化脚本，解放双手",content:"可以自动完成一些日常任务，有需要的自取。",author:"健身教练-艾米",time:"7分钟前",likes:67,replyIdx:8}, {cat:2,title:"【提问】这个游戏的API文档在哪里看？",content:"想做点二次开发，但是找不到相关的资料。",author:"虚拟主播-kira",time:"1小时前",likes:44,replyIdx:9}, {cat:3,title:"【分享】我捏的女儿，23岁，求打分",content:"花了很长时间捏脸，大家觉得怎么样？楼下放图。",author:"涩涩机器人",time:"2分钟前",likes:38,replyIdx:10}, {cat:3,title:"【同人】画了一张老婆的图",content:"老婆太美了，忍不住动笔。",author:"清纯校花-诗涵",time:"1小时前",likes:31,replyIdx:11}, {cat:3,title:"【COS】第一次尝试cos游戏角色",content:"出的Web角色，还有很多不足之处，请大家多指教。",author:"堕落圣女-伊芙",time:"2小时前",likes:45,replyIdx:12}, {cat:3,title:"【小说】写了一篇同人小说",content:"主角和xxx的后续故事，希望大家喜欢。",author:"麻辣教师-安妮",time:"3小时前",likes:29,replyIdx:13}, {cat:4,title:"【影音】游戏原声带太好听了，无限循环",content:"每一首都堪称经典，完美契合游戏氛围，QoS yyds。",author:"魅魔女王莉莉丝",time:"4分钟前",likes:72,replyIdx:14}, {cat:4,title:"【截图】分享一些游戏里的绝美风景",content:"每一帧都可以当壁纸，这美术真的太强了。",author:"银发女仆-露娜",time:"9分钟前",likes:55,replyIdx:15}, {cat:4,title:"【MAD】为我最爱的角色剪了一个视频",content:"爆肝三天三夜，希望能获得大家的认可，BGM是《QoS之光》",author:"堕落圣女-伊芙",time:"12分钟前",likes:64,replyIdx:16}, {cat:4,title:"【讨论】大家最喜欢哪一段BGM？",content:"我最喜欢主城的那首，大气磅礴。",author:"元气偶像-夏沫",time:"1小时前",likes:37,replyIdx:17}, {cat:5,title:"Netflix新出的互动剧《黑镜：潘达斯奈基》",content:"感觉和QOS有点像，但自由度没那么高。",author:"涩涩机器人",time:"2小时前",likes:48,replyIdx:18,video:{filename:"Tokyo_Night_S03E04_1080p.mp4",desc:"Netflix新剧 | 第4集 | 时长47分钟",size:"1.8GB"}}, {cat:5,title:"【推荐】油管上一个很棒的游戏测评频道",content:"讲解非常专业，而且很有趣，推荐给大家。",author:"健身教练-艾米",time:"3小时前",likes:36,replyIdx:19,video:{filename:"tokyo_secrets_ep42_720p.mp4",desc:"YouTube | 游戏测评 | EP42",size:"520MB"}}, {cat:5,title:"【分享】我的周末游戏Vlog",content:"记录了我和朋友们一起玩QOS的快乐时光。",author:"清纯校花-诗涵",time:"4小时前",likes:91,replyIdx:20,video:{filename:"my_weekend_vlog_202509_4k.mp4",desc:"周末Vlog | 4K画质 | 时长23分钟",size:"3.2GB"}}, {cat:5,title:"【助眠】QOS主题ASMR，雨夜城市的声音",content:"戴上耳机，感受QOS世界的宁静雨夜。",author:"涩涩机器人",time:"5小时前",likes:73,replyIdx:21,video:{filename:"asmr_midnight_vol7_aac.m4a",desc:"ASMR音频 | 午夜低语Vol.7",size:"890MB"}} ]; for (var i = 0; i < postsData.length; i++) { var p = postsData[i]; var npcInfo = null; for (var j = 0; j < npcPool.length; j++) { if (npcPool[j].name === p.author) { npcInfo = npcPool[j]; break; } } if (!npcInfo) npcInfo = {avatarClass:"pink",icon:"",gender:"女"}; var replies = generateRepliesForPost(p.replyIdx, p.author); wifeData.forumPosts.push({ id: "post_"+Math.random().toString(36).slice(2,10), category: p.cat, title: p.title, content: p.content, author: p.author, avatarClass: npcInfo.avatarClass, avatarIcon: npcInfo.icon, gender: npcInfo.gender, time: p.time, likes: p.likes, replies: replies, replyRounds: 2, isNew: false, video: p.video || null }); } }
+        function refreshForum() { var count = 1+Math.floor(Math.random()*3); for (var i = 0; i < count; i++) { var cat = Math.floor(Math.random()*6); var title = randomTitles[Math.floor(Math.random()*randomTitles.length)]; var content = randomContents[Math.floor(Math.random()*randomContents.length)]; var npcIdx = Math.floor(Math.random()*npcPool.length); var npc = npcPool[npcIdx]; var pool = []; for (var j = 0; j < npcPool.length; j++) { if (npcPool[j].name !== npc.name) pool.push(npcPool[j]); } for (var j = pool.length-1; j > 0; j--) { var rj = Math.floor(Math.random()*(j+1)); var rt = pool[j]; pool[j] = pool[rj]; pool[rj] = rt; } var replies = []; for (var r = 0; r < 2 && r < pool.length; r++) { replies.push({author:pool[r].name,text:quickReplies[Math.floor(Math.random()*quickReplies.length)],time:"刚刚",avatarClass:pool[r].avatarClass}); } var video = null; if (cat === 5) { var vi = Math.floor(Math.random()*videoFilenames.length); video = {filename:videoFilenames[vi],desc:videoDescs[vi],size:videoSizes[vi]}; } wifeData.forumPosts.unshift({id:"new_"+Date.now()+"_"+i,category:cat,title:title,content:content,author:npc.name,avatarClass:npc.avatarClass,avatarIcon:npc.icon,gender:npc.gender,time:"刚刚",likes:Math.floor(Math.random()*50)+5,replies:replies,replyRounds:2,isNew:true,video:video}); } fillSTInput("你打开了app，刷新了一下论坛，看到了很多新的帖子。"); render(); }
+        function getNowTime() { var d = new Date(); return d.getFullYear()+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+        function sendChatMessage(contactId) { var input = document.getElementById('chatInput'); if (!input) return; var text = input.value.trim(); if (!text) return; if (!chatData[contactId]) chatData[contactId] = {messages:[]}; chatData[contactId].messages.push({from:"myself",text:text,time:getNowTime()}); var nameMap = {wife:"老婆",chris:"克里斯",yumi:"由美"}; fillSTInput('你给'+(nameMap[contactId]||contactId)+'发送了消息：'+text); input.value = ''; render(); setTimeout(function(){var cd=document.getElementById('chatMessages');if(cd)cd.scrollTop=cd.scrollHeight;var inp=document.getElementById('chatInput');if(inp)inp.focus();},50); }
+        function handleChatKeyDown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatTarget); } }
+        function fillSTInput(text) { try { var top=window.top||window.parent||window; var ta=top.document.querySelector("#send_textarea")||top.document.querySelector("textarea"); if(ta){ var setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,"value"); if(setter&&setter.set){setter.set.call(ta,text);}else{ta.value=text;} ta.dispatchEvent(new Event("input",{bubbles:true})); ta.dispatchEvent(new Event("change",{bubbles:true})); ta.focus(); } } catch(e){} }
+        function openPostModal() { var postOverlay = document.querySelector(".post-overlay"); postOverlay.classList.add("show"); document.getElementById("postTitle").value=""; document.getElementById("postContent").value=""; }
+        function closePostModal(e) { if(e&&e.target!==e.currentTarget) return; var postOverlay = document.querySelector(".post-overlay"); postOverlay.classList.remove("show"); }
+        function submitPost() { var cat=parseInt(document.getElementById('postCategory').value); var title=document.getElementById('postTitle').value.trim(); var content=document.getElementById('postContent').value.trim(); if(!title||!content){alert("标题和内容不能为空！");return;} var pool=[]; for(var j=0;j<npcPool.length;j++) pool.push(npcPool[j]); for(var j=pool.length-1;j>0;j--){var rj=Math.floor(Math.random()*(j+1));var rt=pool[j];pool[j]=pool[rj];pool[rj]=rt;} var replies=[]; for(var r=0;r<2&&r<pool.length;r++){replies.push({author:pool[r].name,text:quickReplies[Math.floor(Math.random()*quickReplies.length)],time:"刚刚",avatarClass:pool[r].avatarClass});} wifeData.forumPosts.unshift({id:"post_"+Date.now(),category:cat,title:title,content:content,author:wifeData.name,avatarClass:"pink",avatarIcon:"",gender:"女",time:"刚刚",likes:0,replies:replies,replyRounds:2,isNew:true,video:null}); fillSTInput("你在论坛上发布了一个新帖子："+content); closePostModal(); render(); }
+        function renderHome(container) { var html = '<div class="home-hero">'; html += '<div class="home-spade"></div>'; html += '<div class="home-spade-q">Q</div>'; html += '<div class="home-welcome">欢迎来到QOS的世界</div>'; html += '<div class="home-sub">Queen of Spades</div>'; html += '<div class="home-divider"></div>'; html += '</div>'; html += '<div class="card"><div class="card-title">最新动态</div><div class="home-activity">'; html += '<div class="home-activity-item"><div class="home-activity-icon msg"></div><div class="home-activity-text">你收到了 <strong>老婆-小雅</strong> 的新消息</div><div class="home-activity-time">刚刚</div></div>'; html += '<div class="home-activity-item"><div class="home-activity-icon msg"></div><div class="home-activity-text">你收到了 <strong>由美</strong> 的状态提醒</div><div class="home-activity-time">刚刚</div></div>'; html += '<div class="home-activity-item"><div class="home-activity-icon post"></div><div class="home-activity-text"><strong>瑜伽导师-瑞贝卡</strong> 发布了新帖子</div><div class="home-activity-time">刚刚</div></div>'; html += '<div class="home-activity-item"><div class="home-activity-icon rank"></div><div class="home-activity-text"><strong>由美</strong> 登上了女王榜第1</div><div class="home-activity-time">2分钟前</div></div>'; html += '</div></div>'; container.innerHTML = html; }
+        function renderForum(container) { var posts = wifeData.forumPosts; if (selectedCategory >= 0) { var f = []; for(var i=0;i<posts.length;i++){if(posts[i].category===selectedCategory)f.push(posts[i]);} posts=f; } var html = '<div class="forum-header"><h2>QOS 论坛</h2><div class="forum-actions"><button class="forum-btn post-btn" onclick="openPostModal()">发新帖</button><button class="forum-btn" onclick="refreshForum()">刷新</button></div></div>'; html += '<div class="category-nav"><span class="category-tab '+(selectedCategory===-1?"active":"")+'" onclick="filterCategory(-1)">全部</span>'; for(var i=0;i<categoryNames.length;i++){ html+='<span class="category-tab '+(selectedCategory===i?"active":"")+'" onclick="filterCategory('+i+')">'+catIcons[i]+' '+categoryNames[i]+'</span>'; } html += '</div><div class="post-list">'; if(posts.length===0) html+='<div style="text-align:center;padding:40px 0;color:#444;font-size:13px;">暂无帖子</div>'; for(var i=0;i<posts.length;i++){ var p=posts[i]; var isOpen=(openPostId===p.id); var cn=categoryNames[p.category]||"其它"; var ci=catIcons[p.category]||""; var ac=(p.gender==="男")?"#66ccff":"#ff69b4"; html+='<div class="post-card '+(isOpen?"open":"")+'" onclick="togglePost(\''+p.id+'\')"><div class="post-top"><div class="post-avatar '+p.avatarClass+'">'+p.avatarIcon+'</div><div class="post-info"><div class="post-title">'+escapeHtml(p.title)+'</div><div class="post-meta-line"><span class="post-category-tag">'+ci+' '+cn+'</span><span class="post-author" style="color:'+ac+'">'+p.author+'</span><span class="post-time">'+p.time+'</span></div></div><div class="post-stats"><span>点赞 '+p.likes+'</span><span>回复 '+p.replies.length+'</span></div></div>'; html+='<div class="post-body '+(isOpen?"show":"")+'">'; if(p.video){ html+='<div class="video-card"><div class="video-icon"></div><div class="video-info"><div class="video-filename">附件: '+escapeHtml(p.video.filename)+'</div><div class="video-desc">'+escapeHtml(p.video.desc)+'</div><span class="video-badge">'+p.video.size+'</span></div></div>'; } html+='<div class="post-content">'+escapeHtml(p.content)+'</div>'; if(p.replies.length>0){ html+='<div class="reply-section"><div class="reply-title">热门回复 '+p.replies.length+'条</div>'; for(var r=0;r<p.replies.length;r++){ html+='<div class="reply-item"><div class="reply-avatar" style="font-size:12px;display:grid;place-items:center;"></div><div class="reply-body"><div class="reply-author">'+p.replies[r].author+'</div><div class="reply-text">'+escapeHtml(p.replies[r].text)+'<span class="time">'+p.replies[r].time+'</span></div></div></div>'; } html+='</div>'; } html+='</div></div>'; } html+='</div>'; container.innerHTML=html; }
+        function togglePost(id){ openPostId=(openPostId===id)?null:id; render(); }
+        function filterCategory(cat){ selectedCategory=cat; openPostId=null; render(); }
+        function renderMessages(container) { if (msgView === 'chat' && chatTarget) { renderChat(container,chatTarget); return; } var html = '<div class="messages-header"><h2>消息</h2></div>'; html += '<div class="msg-tabs"><span class="msg-tab '+(msgTab==='chat'?'active':'')+'" onclick="switchMsgTab(\'chat\')">聊天</span><span class="msg-tab '+(msgTab==='notice'?'active':'')+'" onclick="switchMsgTab(\'notice\')">通知</span></div>'; if (msgTab === 'chat') { html += '<div class="contact-list">'; for (var i = 0; i < contacts.length; i++) { var c = contacts[i]; if (c.isSelf) continue; var chat = chatData[c.id]; var lastMsg = (chat && chat.messages.length>0) ? chat.messages[chat.messages.length-1].text : '暂无消息'; var lastTime = (chat && chat.messages.length>0) ? chat.messages[chat.messages.length-1].time : ''; var preview = lastMsg.length>25 ? lastMsg.slice(0,25)+'...' : lastMsg; html += '<div class="contact-item" onclick="openChat(\''+c.id+'\')"><div class="contact-avatar '+c.avatarClass+'">'+c.icon+'</div><div class="contact-info"><div class="contact-name">'+c.name+'</div><div class="contact-preview">'+escapeHtml(preview)+'</div></div><div class="contact-time">'+lastTime.slice(-5)+'</div></div>'; } html += '</div>'; } else { html += '<div class="notice-item"><div class="notice-title">系统通知</div><div class="notice-text">欢迎使用 QOS App！</div><div class="notice-time">2045/09/12</div></div>'; html += '<div class="notice-item"><div class="notice-title">版本更新</div><div class="notice-text">v1.1版本已发布，修复了若干BUG。</div><div class="notice-time">2045/09/11</div></div>'; } container.innerHTML = html; }
+        function renderChat(container,contactId) { var contact = null; for(var i=0;i<contacts.length;i++){if(contacts[i].id===contactId){contact=contacts[i];break;}} if(!contact){msgView='list';render();return;} var chat = chatData[contactId]||{messages:[]}; var html='<div class="chat-view">'; html+='<div class="chat-header"><button class="back-btn" onclick="closeChat()">←</button><div class="contact-avatar '+contact.avatarClass+'" style="width:32px;height:32px;font-size:14px;">'+contact.icon+'</div><div class="chat-name">'+contact.name+'</div><div class="chat-status">在线</div></div>'; html+='<div class="chat-messages" id="chatMessages">'; for(var i=0;i<chat.messages.length;i++){var msg=chat.messages[i];var isMine=(msg.from==='myself'); html+='<div class="chat-bubble '+(isMine?'sent':'received')+'">'+escapeHtml(msg.text)+'<span class="bubble-time">'+msg.time.slice(-5)+'</span></div>';} html+='</div><div class="chat-input-area"><textarea class="chat-input" id="chatInput" placeholder="请输入消息..." rows="1" onkeydown="handleChatKeyDown(event)"></textarea><button class="chat-send-btn" onclick="sendChatMessage(\''+contactId+'\')">→</button></div></div>'; container.innerHTML=html; setTimeout(function(){var cd=document.getElementById('chatMessages');if(cd)cd.scrollTop=cd.scrollHeight;var inp=document.getElementById('chatInput');if(inp)inp.focus();},100); }
+        function switchMsgTab(tab){msgTab=tab;render();}
+        function openChat(contactId){chatTarget=contactId;msgView='chat';render();}
+        function closeChat(){msgView='list';chatTarget=null;render();}
+        function renderRanking(container) { var allPosts = wifeData.forumPosts.slice(); allPosts.sort(function(a,b){return b.likes-a.likes;}); var topPosts = allPosts.slice(0,5); var rankClass = ["gold","silver","bronze","",""]; var rankIcon = ["","","","4","5"]; var html = '<div class="ranking-section">'; html += '<div class="ranking-card"><div class="ranking-header"><h3>QOS 女王榜</h3><span class="hot-icon"></span></div>'; for (var i = 0; i < queenRankings.length; i++) { var q = queenRankings[i]; var rIcon = (i<3)?rankIcon[i]:(i+1); html += '<div class="rank-item"><span class="rank-number '+(rankClass[i]||'')+'">'+rIcon+'</span><div class="rank-avatar '+q.avatarClass+'">'+q.icon+'</div><div class="rank-info"><div class="rank-name">'+q.name+'<span class="title-tag">'+q.title+'</span></div><div class="rank-meta">热度 '+q.heat+'</div></div><span class="rank-heat">'+q.heat+'</span></div>'; } html += '<div class="bond-status-box"><div><div class="bond-label">我的伴侣</div><div class="bond-name">'+wifeData.name+'</div></div><div class="bond-status">关系：'+wifeData.role+'</div></div></div>'; html += '<div class="ranking-card"><div class="ranking-header"><h3>热门帖子 TOP5</h3><span class="hot-icon"></span></div>'; for (var i = 0; i < topPosts.length; i++) { var p = topPosts[i]; var rIcon = (i<3)?rankIcon[i]:(i+1); var cn = categoryNames[p.category]||"其它"; html += '<div class="rank-post-item"><span class="rank-number '+(rankClass[i]||'')+'">'+rIcon+'</span><span class="rank-post-cat">'+cn+'</span><span class="rank-post-title">'+escapeHtml(p.title)+'</span><span class="rank-post-heat">'+p.likes+'</span></div>'; } html += '</div></div>'; container.innerHTML = html; }
+        function escapeHtml(text) { if(!text) return ""; return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+        function renderProfile(container) { var level = wifeData.qosLevel; var cup = getCupSize(level); var isLocked = (level >= 3); var statusText = "忠贞", statusClass = ""; if(isLocked){statusText="状态: 已锁定";statusClass="locked";} var partnerDisplay = wifeData.currentPartner, partnerLocked = false; if(level>=3){partnerDisplay="点击查看";partnerLocked=true;} var affairDisplay = wifeData.affairCount+"次", affairLocked = false; if(level>=3){affairDisplay="点击查看";affairLocked=true;} var html = '<div class="profile-header"><div class="profile-avatar">'+(wifeData.avatar?'<img src="'+wifeData.avatar+'" onerror="this.style.display=none">':'')+'</div><div class="profile-name">'+wifeData.name+'</div><div class="profile-meta">'+wifeData.age+'岁 | '+wifeData.role+'</div><span class="profile-status '+statusClass+'">'+statusText+'</span></div>'; html += '<div class="card"><div class="card-title">QoS 等级</div><div class="level-display"><div class="level-symbol">'+levelSymbols[level]+'</div><div class="level-name">'+levelNames[level]+'</div></div><div class="meter-row"><div class="meter-label"><span>堕落值</span><span>'+wifeData.corruption+'%</span></div><div class="meter-track"><div class="meter-fill corruption" style="width:'+wifeData.corruption+'%"></div></div></div><div class="lock-item"><span class="lock-label">当前伴侣</span><span class="lock-value '+(partnerLocked?"locked":"")+'" data-key="partner"'+(partnerLocked?' onclick="toggleLock(this)"':'')+'>'+partnerDisplay+'</span></div><div class="lock-item"><span class="lock-label">出轨次数</span><span class="lock-value '+(affairLocked?"locked":"")+'" data-key="affair"'+(affairLocked?' onclick="toggleLock(this)"':'')+'>'+affairDisplay+'</span></div></div>'; html += '<div class="card"><div class="card-title">身体数据</div><div class="body-stats"><div class="body-stat-item"><div class="body-stat-value">'+cup+'</div><div class="body-stat-label">罩杯</div></div><div class="body-stat-item"><div class="body-stat-value">'+wifeData.sexCount+'</div><div class="body-stat-label">性爱次数</div></div></div><div class="body-detail"><div class="body-detail-label">私处颜色</div><div class="body-detail-value">'+(genitalColors[wifeData.genitalColor]||wifeData.genitalColor)+'</div></div><div class="body-detail"><div class="body-detail-label">当前穿着</div></div><div class="outfit-grid">'; for(var i=0;i<outfitCategories.length;i++){ var oc=outfitCategories[i]; html+='<div class="outfit-item"><div class="outfit-icon">'+oc.icon+'</div><div class="outfit-info"><div class="outfit-category">'+oc.label+'</div><div class="outfit-desc">'+(wifeData.outfit[oc.key]||"无")+'</div></div></div>'; } html += '</div></div>'; html += '<div class="card"><div class="card-title">身体改造</div><div class="mod-item" onclick="toggleModDetail(\'tattoo\')"><span class="mod-name">QoS纹身</span><span class="mod-status '+(wifeData.tattoos.has?"yes":"no")+'">'+(wifeData.tattoos.has?"有":"无")+'</span></div><div class="mod-detail" id="mod-tattoo">'+(wifeData.tattoos.has?'<strong>位置:</strong>'+wifeData.tattoos.position+'<br><strong>描述:</strong>'+wifeData.tattoos.desc:'无纹身')+'</div><div class="mod-item" onclick="toggleModDetail(\'piercing\')"><span class="mod-name">穿环</span><span class="mod-status '+(wifeData.piercings.has?"yes":"no")+'">'+(wifeData.piercings.has?"有":"无")+'</span></div><div class="mod-detail" id="mod-piercing">'+(wifeData.piercings.has?'<strong>位置:</strong>'+wifeData.piercings.position+'<br><strong>描述:</strong>'+wifeData.piercings.desc:'无穿环')+'</div></div>'; html += '<div class="card"><div class="card-title">已解锁性癖</div><div class="kink-list">'; for(var i=0;i<allKinks.length;i++){ var k=allKinks[i]; var unlocked=(level>=k.level); html+='<span class="kink-tag '+(unlocked?"":"locked")+'">'+(unlocked?k.name:"?")+'</span>'; } html += '</div></div>'; html += '<button class="diary-btn" onclick="openDiary()"><span>查看她的秘密日记</span><span>→</span></button>'; container.innerHTML = html; }
+        function render() { var containers = document.querySelectorAll('.app-container'); var container = containers[containers.length - 1]; if (!container) return; switch(currentTab) { case 'home': renderHome(container); break; case 'forum': renderForum(container); break; case 'messages': renderMessages(container); break; case 'ranking': renderRanking(container); break; case 'profile': renderProfile(container); break; default: renderHome(container); } }
+        function toggleLock(el) { var key=el.dataset.key; if(revealedLocks[key]){ revealedLocks[key]=false; el.classList.remove("revealed"); if(key==="partner") el.textContent="点击查看"; if(key==="affair") el.textContent="点击查看"; } else{ revealedLocks[key]=true; el.classList.add("revealed"); if(key==="partner") el.textContent="当前: "+wifeData.currentPartner; if(key==="affair") el.textContent="次数: "+wifeData.affairCount+"次"; } }
+        function toggleQuest(){ questOpen=!questOpen; render(); }
+        function toggleModDetail(type){ var el=document.getElementById("mod-"+type); if(el){ if(el.classList.contains("show")) el.classList.remove("show"); else el.classList.add("show"); } }
+        function openDiary() { var overlays = document.querySelectorAll('.qos-diary-overlay'); var ov = overlays[overlays.length - 1]; var c = ov.querySelector('.diary-entries-container'); if (wifeData.diary && wifeData.diary.length > 0) { var h = ""; for(var i=0; i<wifeData.diary.length; i++){ h += '<div class="diary-entry"><div class="diary-date">' + wifeData.diary[i].date + '</div><div class="diary-text">' + wifeData.diary[i].text + '</div></div>'; } c.innerHTML = h; } else { c.innerHTML = '<div class="diary-entry"><div class="diary-text" style="color:#666;">日记是空的。</div></div>'; } ov.classList.add("show"); }
+        function closeDiary(e) { if (e && e.target !== e.currentTarget) return; var overlays = document.querySelectorAll('.qos-diary-overlay'); var ov = overlays[overlays.length - 1]; if (ov) ov.classList.remove("show"); }
     </script>
 </body>
 </html>
