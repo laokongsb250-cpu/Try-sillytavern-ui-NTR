@@ -435,24 +435,47 @@
     @keyframes hotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     @keyframes heatGlow { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
     .empty-page { display: grid; place-items: center; height: 100%; color: #444; font-size: 14px; }
-    #qos-root {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647;
-
-  width: 100vw;
-  height: 100dvh;
-  overflow: auto;
-
-  background: #0a0a0a;
+/* QOS 嵌入 SillyTavern 的最终尺寸 */
+#qos-root {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0 auto;
+  overflow: visible;
+  background: transparent;
 }
 
 #qos-root .phone {
-  width: 100%;
+  width: min(100%, 420px);
   max-width: 420px;
-  height: 100dvh;
+  height: 720px;
   min-height: 0;
+  max-height: none;
   margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0f0f0f;
+}
+
+#qos-root .content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#qos-root .bottom-nav {
+  flex: 0 0 auto;
+  display: grid;
+  visibility: visible;
+  opacity: 1;
 }
 
   </style>
@@ -532,7 +555,7 @@
       0:[{author:"东京奈奈子",text:"欢迎你来到这个世界！"},{author:"横滨绫乃",text:"はじめまして！我也是东京的主妇呢。"},{author:"浅草千夏",text:"我也是家政妇！"}],
       1:[{author:"涩谷真由美",text:"名古屋！我之前在名古屋住过三年。"},{author:"樱花酱",text:"美容院工作！穿搭一定很好看。"},{author:"银座美穗",text:"我也是朋友介绍来的。"}],
       2:[{author:"大阪由美",text:"第三次了我太懂了……"},{author:"樱花酱",text:"藏第4页文件夹也太真实了。"},{author:"直树先生",text:"做自己就好。"},{author:"拓也前辈",text:"也要注意安全。"}],
-      3:[{author:"银座美穗",text:"黑桃♠代表被占有的财产。黑桃Q等级是实心黑桃纹样加白色Q。进阶有BBC专用内胆纹身和黑爹免费使用导向箭头。"},{author:"涩谷真由美",text:"银座美穗说得太详细了！"},{author:"直树先生",text:"先从简单的黑桃开始吧。"},{author:"银座美穗",text:"同意先试水。"}],
+      3:[{author:"银座美穗",text:"黑桃♠代表被占有的财产。黑桃Q是实心黑桃纹样加白色Q。进阶有BBC专用内胆纹身和黑爹免费使用导向箭头。"},{author:"涩谷真由美",text:"银座美穗说得太详细了！"},{author:"直树先生",text:"先从简单的黑桃开始吧。"},{author:"银座美穗",text:"同意先试水。"}],
       4:[{author:"东京奈奈子",text:"小黑裙不会出错。拒绝是完全OK的。"},{author:"翔太学长",text:"那位黑人先生会照顾你的。"},{author:"拓也前辈",text:"去俱乐部最重要的是心态。"}],
       5:[{author:"大阪由美",text:"不要主动坦白但也不要撒谎太明显。"},{author:"秋叶原麻衣",text:"把App图标改成计算器的样子。"},{author:"樱花酱",text:"如果他发现了你打算怎么办？"}],
       6:[{author:"东京奈奈子",text:"完全同意你说的……"},{author:"横滨绫乃",text:"我第一次是在六本木的俱乐部。"},{author:"真司郎",text:"肤色对比带来的视觉冲击很特别。"}],
@@ -726,36 +749,11 @@ function switchTab(tab) {
 
   render();
 }
-
 function loadData() {
-  try {
-    if (window.parent && window.parent.Mvu) {
-      var mvuData = window.parent.Mvu.getCurrentMvuData();
-
-      if (mvuData && mvuData.stat_data) {
-        var stat = mvuData.stat_data;
-
-        if (stat.小雅) {
-          var xiaoya = stat.小雅;
-
-          wifeData.corruption =
-            Number(xiaoya.堕落值) || 0;
-
-          wifeData.qosLevel =
-            parseInt(xiaoya.等级, 5) || 0;
-        }
-
-        console.log('[QOS] MVU 数据读取成功');
-      }
-    }
-  } catch (e) {
-    console.warn('[QOS] MVU 数据读取失败，使用默认数据：', e);
-  }
-
   try {
     var helper = window.TavernHelper || window;
 
-    if (helper.getVariables) {
+    if (typeof helper.getVariables === 'function') {
       var cv = helper.getVariables({ type: 'chat' });
       var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
 
@@ -764,11 +762,11 @@ function loadData() {
           wifeData[k] = d[k];
         }
 
-        console.log('[QOS] TavernHelper 数据读取成功');
+        console.log('[QOS] TavernHelper 数据加载成功');
       }
     }
   } catch (e) {
-    console.warn('[QOS] TavernHelper 数据读取失败：', e);
+    console.warn('[QOS] 数据读取失败，使用默认数据：', e);
   }
 
   try {
@@ -784,24 +782,6 @@ function loadData() {
   }
 }
 
-  
-  // 方法 2：fallback 到旧的 TavernHelper 方式
-  try {
-    var helper = window.TavernHelper || window;
-    if (helper.getVariables) {
-      var cv = helper.getVariables({type:'chat'});
-      var d = cv && cv.qos_app && cv.qos_app.wifeProfile;
-      if (d) { 
-        for (var k in d) wifeData[k] = d[k]; 
-        console.log("✅ 从 TavernHelper 加载数据成功");
-      }
-    }
-  } catch(e) {}
-  
-  initForumPosts();
-  render();
-}
-
 function render() {
   var app = document.getElementById('qos-app');
 
@@ -824,28 +804,7 @@ function render() {
     renderProfile(app);
   }
 }
-function render() {
-  var app = document.getElementById('qos-app');
 
-  if (!app) {
-    console.error('[QOS] 找不到 #qos-app');
-    return;
-  }
-
-  app.innerHTML = '';
-
-  if (currentTab === 'home') {
-    renderHome(app);
-  } else if (currentTab === 'forum') {
-    renderForum(app);
-  } else if (currentTab === 'messages') {
-    renderMessages(app);
-  } else if (currentTab === 'ranking') {
-    renderRanking(app);
-  } else if (currentTab === 'profile') {
-    renderProfile(app);
-  }
-}
 
     function initForumPosts() {
 
