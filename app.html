@@ -748,7 +748,31 @@ function switchTab(tab) {
   render();
 }
 
+function render() {
+  var app = document.getElementById('qos-app');
+
+  if (!app) {
+    console.error('[QOS] 找不到 #qos-app');
+    return;
+  }
+
+  app.innerHTML = '';
+
+  if (currentTab === 'home') {
+    renderHome(app);
+  } else if (currentTab === 'forum') {
+    renderForum(app);
+  } else if (currentTab === 'messages') {
+    renderMessages(app);
+  } else if (currentTab === 'ranking') {
+    renderRanking(app);
+  } else if (currentTab === 'profile') {
+    renderProfile(app);
+  }
+}
+
     function initForumPosts() {
+
       if (postsInitialized) return;
       postsInitialized = true;
       
